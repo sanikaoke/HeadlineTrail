@@ -1,0 +1,254 @@
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+    margin: 0;
+    background-color: #f8f9fa; /* Lighter background */
+    color: #343a40; /* Darker text */
+    line-height: 1.6;
+}
+
+header {
+    background-color: #ffffff;
+    padding: 1rem 2rem;
+    border-bottom: 1px solid #dee2e6;
+    text-align: center;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+header h1 {
+    color: #0d6efd; /* Bootstrap blue */
+    margin: 0;
+    font-weight: 600;
+    font-size: 1.8em;
+}
+header p {
+    margin-top: 0.25rem;
+    color: #6c757d; /* Gray text */
+    font-size: 0.95em;
+}
+
+main {
+    max-width: 1320px; /* Wider max-width */
+    margin: 1.5em auto; /* Reduced top margin */
+    padding: 0 1em;
+}
+
+/* --- Filter Controls Styling --- */
+#filter-controls {
+    display: flex;
+    flex-wrap: wrap; /* Allow wrapping on smaller screens */
+    gap: 0.8em; /* Space between filter elements */
+    margin-bottom: 1.5em;
+    padding: 1em;
+    background-color: #ffffff;
+    border-radius: 8px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.07);
+    align-items: center; /* Align items vertically */
+}
+
+#filter-controls input[type="text"],
+#filter-controls select {
+    padding: 0.6em 0.8em; /* Slightly more padding */
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+    font-size: 0.9em;
+    box-sizing: border-box; /* Include padding in width/height */
+}
+
+#filter-controls input[type="text"] {
+    flex-basis: 250px; /* Base width for search */
+    flex-grow: 1;
+}
+
+#filter-controls select {
+    flex-basis: 150px; /* Base width for selects */
+    flex-grow: 1;
+    cursor: pointer;
+    background-color: #fff; /* Ensure white background */
+}
+
+#category-select {
+     min-width: 180px;
+     /* Override default multiselect appearance if needed, but size=1 helps */
+     height: auto; /* Let browser determine height */
+     min-height: 38px; /* Minimum height */
+     overflow-y: auto; /* Add scroll if many options selected */
+     /* For better multiselect UX, consider JS libraries later */
+}
+
+#filter-controls button#refresh-button {
+    padding: 0.6em 0.8em;
+    font-size: 1em; /* Use emoji size */
+    background-color: #e9ecef;
+    border: 1px solid #ced4da;
+    color: #495057;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+    line-height: 1.2; /* Adjust line height for emoji */
+}
+#filter-controls button#refresh-button:hover {
+    background-color: #dee2e6;
+}
+
+hr.filter-divider {
+    border: none;
+    border-top: 1px solid #dee2e6;
+    margin: 1.5em 0; /* Adjusted margin */
+}
+
+
+/* --- News Grid Styling --- */
+#news-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 1.5em;
+}
+
+.news-card {
+    background-color: #ffffff;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.08);
+    display: flex;
+    flex-direction: column; /* Stack items vertically */
+    overflow: hidden;
+    transition: box-shadow 0.3s ease, transform 0.3s ease;
+}
+
+.news-card:hover {
+     box-shadow: 0 5px 15px rgba(0,0,0,0.12);
+     transform: translateY(-3px);
+}
+
+.news-card img {
+    display: block;
+    width: 100%;
+    height: 200px;
+    object-fit: cover;
+    border-bottom: 1px solid #eee;
+}
+.news-card .caption { /* Target caption within card */
+    font-size: 0.8em;
+    color: #6c757d;
+    margin-top: 0.5em; /* Space below title */
+    margin-bottom: auto; /* Push caption (and button below it) down */
+    padding: 0 1em; /* Add padding */
+}
+
+
+/* Apply padding to a content div inside the card */
+.card-content {
+    padding: 0 1em 1em 1em; /* Padding for text/button */
+    display: flex;
+    flex-direction: column;
+    flex-grow: 1; /* Make content area fill available space */
+}
+
+
+.news-card h6 {
+    font-size: 1.05em;
+    font-weight: 600;
+    margin-top: 0.8em; /* Space above title */
+    margin-bottom: 0; /* Reset bottom margin */
+    line-height: 1.35;
+    /* Removed min-height, rely on flexbox */
+}
+
+.news-card button {
+    background-color: #0d6efd;
+    color: white;
+    border: none;
+    padding: 0.7em 1em;
+    border-radius: 5px;
+    cursor: pointer;
+    margin-top: 1em; /* Add space above button */
+    transition: background-color 0.2s ease;
+    width: 100%;
+    font-weight: 500;
+    flex-shrink: 0; /* Prevent button from shrinking */
+}
+
+.news-card button:hover {
+    background-color: #0b5ed7;
+}
+
+/* --- Article Detail Styling --- */
+.view { display: none; }
+.active-view { display: block; }
+
+#article-detail {
+    background-color: #fff;
+    padding: 2em;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+#article-detail #back-button {
+    background: none;
+    border: 1px solid #ccc;
+    color: #555;
+    padding: 0.5em 1em;
+    border-radius: 5px;
+    cursor: pointer;
+    margin-bottom: 1.5em; /* Increased margin */
+    transition: background-color 0.2s ease, color 0.2s ease;
+    display: inline-block; /* Needed for margin */
+}
+#article-detail #back-button:hover {
+    background-color: #f1f1f1;
+    border-color: #bbb;
+}
+
+#detail-title { margin-top: 0; margin-bottom: 0.2em; line-height: 1.3; color: #212529;}
+#detail-caption { margin-bottom: 1.5em; color: #6c757d; font-size: 0.9em;}
+#detail-image { margin-bottom: 1.5em; border-radius: 5px;}
+#detail-content { line-height: 1.7; margin-top: 1em; margin-bottom: 1em;}
+#detail-timeline, #detail-glossary { padding-left: 0.5em;} /* Slight indent for lists */
+#detail-timeline h6, #detail-glossary h6 { margin-top: 1.5em; margin-bottom: 0.5em; color: #0d6efd; }
+#detail-timeline div, #detail-glossary div { margin-bottom: 1.2em; }
+#detail-timeline strong, #detail-glossary strong { font-weight: 600;}
+
+/* Style the link button container */
+#detail-link-container { margin: 1.5em 0; }
+/* Style the link button itself */
+#detail-link-container a {
+    display: inline-block;
+    padding: 0.6em 1.2em;
+    background-color: #198754; /* Green */
+    color: white;
+    text-decoration: none;
+    border-radius: 5px;
+    border: none;
+    transition: background-color 0.2s ease;
+}
+#detail-link-container a:hover {
+    background-color: #146c43;
+}
+
+
+hr { border: none; border-top: 1px solid #dee2e6; margin: 2em 0; }
+hr.content-divider { margin: 1em 0; } /* More subtle divider */
+
+
+/* --- Loading/Error Styling --- */
+#loading-indicator, #error-message, #no-results-message {
+     margin: 2em auto; /* Center horizontally */
+     padding: 1em;
+     max-width: 600px; /* Limit width */
+     font-size: 1.05em;
+     color: #6c757d;
+     text-align: center;
+     border-radius: 4px;
+}
+#error-message {
+    background-color: #f8d7da;
+    color: #842029;
+    border: 1px solid #f5c2c7;
+}
+#no-results-message {
+    background-color: #e9ecef;
+    border: 1px solid #ced4da;
+}
+
+/* --- Footer --- */
+footer { text-align: center; margin-top: 3em; padding: 1.5em; font-size: 0.85em; color: #6c757d; border-top: 1px solid #dee2e6; }
