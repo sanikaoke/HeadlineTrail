@@ -83,13 +83,13 @@ Output
   1. **Title:** Based on the news article, come up with a relevant title for the article.
   2. **Historical Context Timeline:** Create a chronological timeline of the key historical events that directly contribute to understanding the current news article. Format each entry as:
   **[YEAR/PERIOD] - [BRIEF DESCRIPTIVE HEADLINE]**
-  [A single paragraph of 4-6 sentences explaining: what happened, who the key players were (with necessary background about these people/groups), the situation at that time, and why these events occurred. Use language an average high school student can understand.]
-  *[1-2 sentences explicitly connecting this historical event to the current news article.]*
+  [A single paragraph of 3-4 sentences explaining: what happened, who the key players were (with necessary background about these people/groups), the situation at that time, and why these events occurred. Use language an average high school student can understand.]
+  **[1-2 sentences explicitly connecting this historical event to the current news article.]**
     (Timeline Content Requirements: Focus only on relevant events, provide context, explain importance, use accessible language)
 
   3. **Glossary of Terms:** Include a section that defines any complex terms, jargon, or unfamiliar concepts mentioned in the article or timeline using extremely simple language.
 
-  4. **Category Assignment:** Assign the **single most relevant category** to this article from the following list: {', '.join(ALLOWED_CATEGORIES)}. Output only the chosen category name.
+  4. **Category Assignment:** Assign the single most relevant category to this article from the following list: {', '.join(ALLOWED_CATEGORIES)}. Output only the chosen category name.
 """
 print("Meta prompt defined.")
 
