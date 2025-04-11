@@ -7,6 +7,7 @@ from flask_cors import CORS # Import CORS
 import os
 from datetime import datetime
 from dotenv import load_dotenv # Ensure dotenv is imported if used for keys
+from update_db import process_and_store_articles  # Add this import at the top
 
 print("--- Backend API Starting ---")
 
@@ -305,6 +306,75 @@ def get_filter_options():
         if conn:
             conn.close()
         return jsonify({"error": "Failed to retrieve filter options"}), 500
+
+@app.route('/api/fetch-latest-news', methods=['POST'])
+def fetch_latest_news():
+    """Endpoint to fetch and process latest news articles."""
+    try:
+        print("\n--- Starting Fetch Latest News Request ---")
+        response_data = {
+            'success': False,
+            'message': '',
+            'new_articles_count': 0,
+            'details': {
+                'dates_processed': [],
+                'articles_per_date': {},
+                'errors': []
+            }
+        }
+
+        # Load and verify API keys
+        load_dotenv()
+        NEWS_API_KEY = os.getenv("NEWS_API_KEY")
+        OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+
+        if not NEWS_API_KEY or not OPENAI_API_KEY:
+            error_msg = 'Missing API keys: ' + \
+                       ('NEWS_API_KEY ' if not NEWS_API_KEY else '') + \
+                       ('OPENAI_API_KEY' if not OPENAI_API_KEY else '')
+            print(f"Error: {error_msg}")
+            response_data['message'] = error_msg
+            return jsonify(response_data), 500
+
+        try:
+            # Call process_and_store_articles with detailed logging
+            print("Calling process_and_store_articles...")
+            result = process_and_store_articles()
+            print(f"Result from process_and_store_articles: {result}")
+            
+            # Handle boolean result for backward compatibility
+            if isinstance(result, bool):
+                if result:
+                    response_data['success'] = True
+                    response_data['message'] = "Successfully processed new articles"
+                else:
+                    response_data['message'] = "Failed to process articles"
+                    return jsonify(response_data), 500
+            elif isinstance(result, dict):
+                response_data.update(result)
+            else:
+                error_msg = f'Invalid result format from process_and_store_articles: {result}'
+                print(f"Error: {error_msg}")
+                response_data['message'] = error_msg
+                return jsonify(response_data), 500
+
+            return jsonify(response_data), 200
+
+        except Exception as e:
+            error_msg = f'Error during processing: {str(e)}'
+            print(f"Error: {error_msg}")
+            response_data['details']['errors'].append(str(e))
+            response_data['message'] = error_msg
+            return jsonify(response_data), 500
+
+    except Exception as e:
+        error_msg = f'Unexpected error: {str(e)}'
+        print(f"Error: {error_msg}")
+        return jsonify({
+            'success': False,
+            'message': error_msg,
+            'details': {'errors': [str(e)]}
+        }), 500
     
 # --- Run the Flask App ---
 if __name__ == '__main__':

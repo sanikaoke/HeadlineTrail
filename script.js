@@ -354,4 +354,57 @@ document.addEventListener('DOMContentLoaded', () => {
         fetchAndRenderArticles(currentFilters); // Fetch articles
     });
 
+    async function handleRefresh() {
+        const refreshButton = document.getElementById('refresh-button');
+        const loadingIndicator = document.getElementById('loading-indicator');
+        
+        try {
+            refreshButton.disabled = true;
+            refreshButton.textContent = '🔄 Fetching Latest News...';
+            loadingIndicator.style.display = 'block';
+
+            const response = await fetch('http://127.0.0.1:5001/api/fetch-latest-news', {
+                method: 'POST',
+            });
+
+            const result = await response.json();
+            
+            if (result.success) {
+                await fetchFilterOptions();
+                await fetchAndRenderArticles(currentFilters);
+                
+                // Show detailed success message
+                const message = `Successfully fetched ${result.new_articles_count} new articles\n` +
+                              `Dates processed: ${result.details.dates_processed.length}`;
+                showNotification(message);
+            } else {
+                throw new Error(result.message || 'Failed to process news articles');
+            }
+            
+        } catch (error) {
+            console.error('Error fetching latest news:', error);
+            showNotification('Failed to fetch latest news: ' + error.message, 'error');
+        } finally {
+            refreshButton.disabled = false;
+            refreshButton.textContent = '🔄 Fetch Latest News';
+            loadingIndicator.style.display = 'none';
+        }
+    }
+
+    function showNotification(message, type = 'success') {
+        const notification = document.createElement('div');
+        notification.className = `notification ${type}`;
+        notification.textContent = message;
+        document.body.appendChild(notification);
+    
+        // Remove notification after 3 seconds
+        setTimeout(() => {
+            notification.remove();
+        }, 3000);
+    }
+    
+    // Add event listener for refresh button
+    refreshButton.removeEventListener('click', handleFilterChange);  // Remove old listener if exists
+    refreshButton.addEventListener('click', handleRefresh);
+
 }); // End DOMContentLoaded

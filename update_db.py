@@ -14,7 +14,7 @@ from typing import List, Dict # Added Dict
 from newspaper import Article, ArticleException # Import newspaper3k
 from dotenv import load_dotenv
 import sqlite3 # Import SQLite library
-from datetime import datetime
+from datetime import datetime, timedelta
 
 print("Libraries imported.")
 
@@ -222,13 +222,20 @@ def insert_or_update_article(article_data):
 
 
 # --- Helper: Fetch News ---
-def fetch_news_articles(api_key, country="us"):
-    """Fetches top headlines from NewsAPI."""
+def fetch_news_articles(api_key, from_date=None, to_date=None, country="us"):
+    """Fetches news articles from NewsAPI for a specific date range."""
     if not api_key:
         print("NewsAPI key not available.")
         return []
-    api_url = f"https://newsapi.org/v2/top-headlines?country={country}&apiKey={api_key}"
-    print(f"Attempting NewsAPI fetch...")
+
+    # Build the API URL with date parameters
+    api_url = f"https://newsapi.org/v2/top-headlines?country={country}"
+    if from_date and to_date:
+        api_url += f"&from={from_date}&to={to_date}"
+    api_url += f"&apiKey={api_key}"
+    
+    print(f"Fetching news for period: {from_date} to {to_date}")
+    
     try:
         response = requests.get(api_url, timeout=15)
         response.raise_for_status()
@@ -240,8 +247,9 @@ def fetch_news_articles(api_key, country="us"):
         else:
             print(f"NewsAPI Error: {data.get('message')}")
             return []
-    except Exception as e: print(f"NewsAPI request error: {e}")
-    return []
+    except Exception as e:
+        print(f"NewsAPI request error: {e}")
+        return []
 
 # --- Helper: Scrape News (newspaper3k) ---
 def scrape_article_text_newspaper(url):
@@ -299,107 +307,158 @@ def get_timeline_and_glossary(client: OpenAI, article_text: str, model_name: str
          print(f"Failed (Error Type: {error_type}, Details: {details})")
          return None
 
+def get_latest_db_date():
+    """Gets the most recent published_at_iso date from the database."""
+    conn = None
+    try:
+        conn = sqlite3.connect(DB_NAME)
+        cursor = conn.cursor()
+        cursor.execute(f"SELECT MAX(published_at_iso) FROM {TABLE_NAME}")
+        result = cursor.fetchone()[0]
+        if result:
+            return pd.to_datetime(result).date()
+        return None
+    except Exception as e:
+        print(f"Error getting latest date: {e}")
+        return None
+    finally:
+        if conn:
+            conn.close()
+
 # ==============================================================================
 # SECTION 4: MAIN PROCESSING LOGIC
 # ==============================================================================
+def clean_article_content(content):
+    """Clean article content by removing '[+nnn chars]' pattern and formatting properly."""
+    if not content or not isinstance(content, str):
+        return None
+    
+    # Match pattern like '[+123 chars]' or '[+ 123 chars]' or similar variations
+    import re
+    cleaned_content = re.sub(r'\[\+\s*\d+\s*chars?\].*$', '', content, flags=re.IGNORECASE)
+    
+    # Clean up the result
+    cleaned_content = cleaned_content.strip()
+    
+    # Add ellipsis if content was truncated
+    if cleaned_content and cleaned_content != content:
+        cleaned_content += "..."
+    
+    return cleaned_content if cleaned_content else None
+
 def process_and_store_articles():
     """Main function to fetch, process, and store articles in the DB."""
-    print("\n--- Starting Article Processing & Storage ---")
-    init_db() # Ensure DB and table exist
+    try:
+        print("\n--- Starting Article Processing & Storage ---")
+        init_db()
 
-    raw_articles = fetch_news_articles(NEWS_API_KEY)
-    if not raw_articles:
-        print("No articles fetched. Stopping.")
-        return
+        # Get latest date and setup date range
+        latest_db_date = get_latest_db_date()
+        start_date = (latest_db_date + timedelta(days=1)) if latest_db_date else (datetime.now().date() - timedelta(days=30))
+        current_date = datetime.now().date()
+        total_articles_saved = 0
+        
+        result = {
+            'success': False,
+            'articles_saved': 0,
+            'dates_processed': [],
+            'articles_per_date': {},
+            'errors': []
+        }
 
-    total_articles = len(raw_articles)
-    skipped_count = 0
-    db_saved_count = 0
-    print(f"Processing {total_articles} fetched articles...")
-    print("="*60)
+        while start_date <= current_date:
+            print(f"\nProcessing date: {start_date}")
+            from_date = start_date.isoformat()
+            to_date = (start_date + timedelta(days=1)).isoformat()
+            raw_articles = fetch_news_articles(NEWS_API_KEY, from_date, to_date)
+            
+            daily_count = 0
+            
+            if not raw_articles:
+                result['dates_processed'].append(start_date.isoformat())
+                result['articles_per_date'][start_date.isoformat()] = 0
+                start_date += timedelta(days=1)
+                continue
 
-    for index, article_data in enumerate(raw_articles):
-        print(f"\n--- Processing Article {index + 1} of {total_articles} ---")
-        original_title=article_data.get('title','N/A')
-        print(f"   Title: {original_title[:80]}...")
-        description=article_data.get('description')
-        content_snippet=article_data.get('content')
-        source_name=article_data.get('source',{}).get('name','N/A')
-        published_at=article_data.get('publishedAt','N/A')
-        url=article_data.get('url','#')
-        image_url=article_data.get('urlToImage')
+            for index, article_data in enumerate(raw_articles):
+                print(f"\n--- Processing Article {index + 1} of {len(raw_articles)} ---")
+                
+                # Get basic article info
+                url = article_data.get('url')
+                if not url or url == '#':
+                    result['errors'].append(f"Invalid URL for article on {start_date}")
+                    continue
 
-        if not url or url == '#':
-            skipped_count += 1
-            print(f"   Skipping: Invalid URL.")
-            continue
+                # Get article content in order of priority
+                article_content = None
+                content_source = "None"
 
-        # Determine content & scrape if needed
-        scraped_full_text = scrape_article_text_newspaper(url)
-        article_content_for_db = None
-        text_for_llm = None
-        source_used_for_llm = "None (Skipped)"
+                # 1. Try newspaper3k scraping
+                scraped_text = scrape_article_text_newspaper(url)
+                if scraped_text:
+                    article_content = clean_article_content(scraped_text)  # Clean scraped content too
+                    content_source = "Scraped"
+                
+                # 2. Try NewsAPI content
+                elif article_data.get('content'):
+                    cleaned_content = clean_article_content(article_data['content'])
+                    if cleaned_content:
+                        article_content = cleaned_content
+                        content_source = "API Content (Cleaned)"
+                
+                # 3. Fall back to description
+                elif article_data.get('description'):
+                    article_content = clean_article_content(article_data['description'])  # Clean description too
+                    content_source = "API Description"
+                
+                if not article_content:
+                    result['errors'].append(f"No content available for {url}")
+                    continue
 
-        if scraped_full_text:
-            article_content_for_db = scraped_full_text
-            text_for_llm = scraped_full_text
-            source_used_for_llm = f"Scraped Text (~{len(scraped_full_text)} chars)"
-        elif content_snippet and content_snippet.strip():
-            article_content_for_db = content_snippet
-            text_for_llm = content_snippet.split('[+')[0].strip()+"..." if '[+' in content_snippet else content_snippet
-            source_used_for_llm = "API Content Snippet"
-        elif description and description.strip():
-            article_content_for_db = description
-            text_for_llm = description
-            source_used_for_llm = "API Description"
-        else: 
-            article_content_for_db = "Content unavailable."
-            text_for_llm = None
+                # Prepare text for LLM
+                text_for_llm = article_content
+                if len(text_for_llm) > 15000:
+                    text_for_llm = text_for_llm[:15000] + "..."
 
-        # Truncate LLM input if needed
-        if text_for_llm and "Scraped Text" in source_used_for_llm:
-             MAX_LLM_INPUT_CHARS = 15000
-             if len(text_for_llm) > MAX_LLM_INPUT_CHARS:
-                text_for_llm = text_for_llm[:MAX_LLM_INPUT_CHARS]
-                print(f"   WARNING: Truncating LLM input.")
+                # Process with LLM
+                if text_for_llm:
+                    output = get_timeline_and_glossary(openai_client, text_for_llm)
+                    if output:
+                        db_data = {
+                            "llm_generated_title": output.title_entry,
+                            "original_title": article_data.get('title', 'N/A'),
+                            "source": article_data.get('source', {}).get('name', 'N/A'),
+                            "published_at": article_data.get('publishedAt', 'N/A'),
+                            "article_content": article_content,  # Store cleaned content
+                            "article_url": url,
+                            "article_url_to_image": article_data.get('urlToImage'),
+                            "historical_context": [entry.model_dump() for entry in output.timeline_entries],
+                            "glossary": [entry.model_dump() for entry in output.glossary_entries],
+                            "article_category": getattr(output, 'article_category', 'Other'),
+                            "content_source": content_source
+                        }
+                        
+                        if insert_or_update_article(db_data):
+                            daily_count += 1
+                            total_articles_saved += 1
 
-        # Call LLM
-        if text_for_llm:
-            output = get_timeline_and_glossary(openai_client, text_for_llm)
-            if output:
-                llm_category = getattr(output, 'article_category', 'Other')
-                article_category = llm_category if llm_category in ALLOWED_CATEGORIES else "Other"
-                if article_category != llm_category:
-                    print(f"   Warn: LLM category '{llm_category}' invalid.")
+            result['dates_processed'].append(start_date.isoformat())
+            result['articles_per_date'][start_date.isoformat()] = daily_count
+            start_date += timedelta(days=1)
+            time.sleep(1)  # Rate limiting between dates
 
-                # Prepare data for DB, converting complex types
-                timeline_list = [entry.model_dump() for entry in output.timeline_entries] if output.timeline_entries else []
-                glossary_list = [entry.model_dump() for entry in output.glossary_entries] if output.glossary_entries else []
+        result['success'] = total_articles_saved > 0
+        result['articles_saved'] = total_articles_saved
+        
+        print("="*60)
+        print(f"\n--- Article Processing Finished ---")
+        print(f"Total new articles saved: {total_articles_saved}")
+        
+        return total_articles_saved > 0
 
-                db_data = {
-                    "llm_generated_title": output.title_entry, "original_title": original_title,
-                    "source": source_name, "published_at": published_at,
-                    "article_description": description or "N/A",
-                    "article_content": article_content_for_db, # Content for display
-                    "article_url": url, "article_url_to_image": image_url,
-                    "historical_context": timeline_list, # Pass list here
-                    "glossary": glossary_list,           # Pass list here
-                    "article_category": article_category,
-                    "llm_input_source": source_used_for_llm
-                }
-                if insert_or_update_article(db_data): db_saved_count += 1
-                else: skipped_count += 1 # Count failed DB inserts as skips
-            else:
-                skipped_count += 1
-                print("   LLM processing failed. Skipping DB insert.")
-        else:
-             skipped_count += 1
-             print("   No usable text for LLM. Skipping DB insert.")
-        time.sleep(0.5) # Be polite to APIs/websites
-
-    print("="*60)
-    print(f"\n--- Article Processing Finished ---")
-    print(f"DB Records Saved/Updated = {db_saved_count}, Skipped = {skipped_count}")
+    except Exception as e:
+        print(f"Error in process_and_store_articles: {str(e)}")
+        return False
 
 # --- Entry Point for Backend Script ---
 if __name__ == "__main__":
