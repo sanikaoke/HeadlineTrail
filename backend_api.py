@@ -35,24 +35,20 @@ DEFAULT_IMAGE = "https://images.unsplash.com/photo-1586339949916-3e9457bef6d3?ix
 
 # --- Database Helper ---
 def get_db_connection():
-    """Creates a connection to the SQLite database."""
-    # Check if DB exists before connecting
-    if not os.path.exists(DB_PATH):
-        print(f"DATABASE ERROR: File '{DB_NAME}' not found at '{DB_PATH}'")
+    """Creates a connection to the Turso cloud SQLite database."""
+    # These will be read from Vercel's environment variables
+    url = os.getenv("TURSO_DATABASE_URL")
+    auth_token = os.getenv("TURSO_AUTH_TOKEN")
+
+    if not url or not auth_token:
+        print("DATABASE ERROR: Missing TURSO_DATABASE_URL or TURSO_AUTH_TOKEN environment variables.")
         return None
     try:
-        conn = sqlite3.connect(DB_PATH)
-        conn.row_factory = sqlite3.Row # Return rows that act like dictionaries
-        # Check if table exists
-        cursor = conn.cursor()
-        cursor.execute(f"SELECT name FROM sqlite_master WHERE type='table' AND name='{TABLE_NAME}';")
-        if cursor.fetchone() is None:
-             print(f"DATABASE ERROR: Table '{TABLE_NAME}' not found in '{DB_NAME}'.")
-             conn.close()
-             return None
-        # print("Database connection successful.") # Reduce noise
+        # Connect to Turso using the libsql-client format
+        conn = sqlite3.connect(f"file:{url}?authToken={auth_token}&secure=true", uri=True)
+        conn.row_factory = sqlite3.Row
         return conn
-    except sqlite3.Error as e:
+    except Exception as e:
         print(f"Database connection error: {e}")
         return None
 
