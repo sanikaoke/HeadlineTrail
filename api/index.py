@@ -263,32 +263,6 @@ def get_filter_options():
             conn.close()
         return jsonify({"error": "Failed to retrieve filter options"}), 500
 
-'''@app.route('/api/fetch-latest-news', methods=['POST'])
-def fetch_latest_news():
-    """Endpoint to fetch and process latest news articles."""
-    try:
-        print("\n--- Starting Fetch Latest News Request ---")
-        # This function is long-running and may time out on Vercel's hobby plan.
-        # It's left here for completeness but should be run manually or via a different mechanism for production.
-        result = process_and_store_articles()
-        
-        response_data = {}
-        if isinstance(result, bool):
-            response_data['success'] = result
-            response_data['message'] = "Process completed." if result else "Process failed."
-        elif isinstance(result, dict):
-            response_data = result
-        else:
-            response_data['success'] = False
-            response_data['message'] = 'Unknown result from process.'
-
-        return jsonify(response_data), 200
-
-    except Exception as e:
-        error_msg = f'Error during processing: {str(e)}'
-        print(f"Error: {error_msg}")
-        return jsonify({'success': False, 'message': error_msg}), 500
-    '''
 @app.route('/api/fetch-latest-news', methods=['POST'])
 def fetch_latest_news():
     """Endpoint to fetch and process latest news articles."""
