@@ -1,0 +1,10 @@
+Flask
+flask_cors
+pandas
+requests
+python-dotenv
+openai
+pydantic
+newspaper3k
+beautifulsoup4
+libsql-client
