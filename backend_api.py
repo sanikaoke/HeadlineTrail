@@ -6,7 +6,7 @@ from flask_cors import CORS
 import os
 from datetime import datetime
 from dotenv import load_dotenv
-from update_db import process_and_store_articles
+#from update_db import process_and_store_articles
 
 print("--- Backend API Starting ---")
 
@@ -263,7 +263,7 @@ def get_filter_options():
             conn.close()
         return jsonify({"error": "Failed to retrieve filter options"}), 500
 
-@app.route('/api/fetch-latest-news', methods=['POST'])
+'''@app.route('/api/fetch-latest-news', methods=['POST'])
 def fetch_latest_news():
     """Endpoint to fetch and process latest news articles."""
     try:
@@ -288,7 +288,17 @@ def fetch_latest_news():
         error_msg = f'Error during processing: {str(e)}'
         print(f"Error: {error_msg}")
         return jsonify({'success': False, 'message': error_msg}), 500
-    
+    '''
+@app.route('/api/fetch-latest-news', methods=['POST'])
+def fetch_latest_news():
+    """Endpoint to fetch and process latest news articles."""
+    # This feature is disabled on the live deployment to avoid timeouts 
+    # and dependencies. It should be run manually.
+    print("Fetch Latest News endpoint called, but is disabled on live deployment.")
+    return jsonify({
+        'success': False, 
+        'message': 'This feature is disabled on the live version and must be run manually.'
+    }), 403
 # --- Run the Flask App ---
 if __name__ == '__main__':
     print("Starting Flask development server on http://127.0.0.1:5001")
