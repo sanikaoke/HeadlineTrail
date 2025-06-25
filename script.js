@@ -24,7 +24,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- API URLs ---
     const backendBaseUrl = '';
     const articlesUrl = `${backendBaseUrl}/api/articles`;
-    const filterOptionsUrl = `${backend_gibaseUrl}/api/filter-options`;
+    const filterOptionsUrl = `${backendBaseUrl}/api/filter-options`;
 
     // --- State ---
     let currentFilters = {
