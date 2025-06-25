@@ -265,7 +265,28 @@ document.addEventListener('DOMContentLoaded', () => {
              detailLinkContainer.appendChild(linkButton);
         }
 
-        detailContent.textContent = article.article_content || 'Content not available.';
+        // Handle article content and read more button
+        const detailContent = document.getElementById('detail-content');
+        const readMoreContainer = document.getElementById('read-more-container');
+        
+        // Clear previous content and button
+        detailContent.textContent = article.article_content || 'Content not available';
+        readMoreContainer.innerHTML = '';
+
+        // Always show the read more button if we have a valid URL
+        if (article.article_url && article.article_url !== '#') {
+            const readMoreLink = document.createElement('a');
+            readMoreLink.href = article.article_url;
+            readMoreLink.className = 'read-more-button';
+            readMoreLink.innerHTML = '📰 Read full article online';
+            readMoreLink.target = '_blank';
+            readMoreLink.rel = 'noopener noreferrer';
+            
+            readMoreContainer.appendChild(readMoreLink);
+            readMoreContainer.style.display = 'block';
+        } else {
+            readMoreContainer.style.display = 'none';
+        }
 
         // Timeline
         detailTimeline.innerHTML = '';

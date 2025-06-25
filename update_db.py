@@ -15,6 +15,8 @@ from newspaper import Article, ArticleException # Import newspaper3k
 from dotenv import load_dotenv
 import sqlite3 # Import SQLite library
 from datetime import datetime, timedelta
+from bs4 import BeautifulSoup
+from urllib.parse import urlparse
 
 print("Libraries imported.")
 
@@ -253,26 +255,105 @@ def fetch_news_articles(api_key, from_date=None, to_date=None, country="us"):
 
 # --- Helper: Scrape News (newspaper3k) ---
 def scrape_article_text_newspaper(url):
-     """Scrapes article text using newspaper3k."""
-     if not url or not url.startswith(('http://', 'https://')): return None
-     print(f"Attempting newspaper3k scrape: {url[:80]}...")
-     try:
+    """Enhanced article scraping with multiple fallback methods."""
+    if not url or not url.startswith(('http://', 'https://')):
+        print(f"Invalid URL format: {url}")
+        return None
+
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+    }
+
+    print(f"Attempting to scrape: {url[:80]}...")
+    content = None
+
+    # Method 1: Try newspaper3k first
+    try:
         article = Article(url, fetch_images=False, request_timeout=20)
         article.download()
-        if not article.html: 
-            print("Scrape failed: HTML download error.")
-            return None
-        article.parse()
-        scraped_text = article.text
-        if scraped_text and scraped_text.strip():
-            print(f"Scrape successful: ~{len(scraped_text)} chars.")
-            return scraped_text
-        else: 
-            print("Scrape complete, no text extracted.")
-            return None
-     except Exception as e:
-        print(f"Scrape error: {type(e).__name__} - {e}")
-        return None
+        if article.html:
+            article.parse()
+            content = article.text
+            if content and len(content.strip()) > 200:  # Ensure meaningful content
+                print(f"Successfully scraped with newspaper3k: ~{len(content)} chars")
+                return content
+            print("newspaper3k returned insufficient content, trying fallback...")
+    except Exception as e:
+        print(f"newspaper3k scraping failed: {type(e).__name__} - {e}")
+
+    # Method 2: Direct BeautifulSoup scraping
+    try:
+        response = requests.get(url, headers=headers, timeout=20)
+        response.raise_for_status()
+        soup = BeautifulSoup(response.text, 'html.parser')
+
+        # Remove unwanted elements
+        for tag in soup.find_all(['script', 'style', 'nav', 'header', 'footer', 'iframe']):
+            tag.decompose()
+
+        # Try common article content selectors
+        content_selectors = [
+            'article', 
+            '[role="article"]',
+            '.article-content',
+            '.story-content',
+            '.post-content',
+            'main',
+            '#main-content',
+            '[itemprop="articleBody"]',
+            '.entry-content'
+        ]
+
+        for selector in content_selectors:
+            article_content = soup.select_one(selector)
+            if article_content:
+                # Extract paragraphs from the content area
+                paragraphs = article_content.find_all('p')
+                content = '\n\n'.join(p.get_text().strip() for p in paragraphs if len(p.get_text().strip()) > 40)
+                if content and len(content) > 200:
+                    print(f"Successfully scraped with BeautifulSoup: ~{len(content)} chars")
+                    return content
+
+        # Method 3: Fallback to all paragraph extraction
+        if not content:
+            paragraphs = soup.find_all('p')
+            content = '\n\n'.join(p.get_text().strip() for p in paragraphs if len(p.get_text().strip()) > 40)
+            if content and len(content) > 200:
+                print(f"Successfully scraped using fallback method: ~{len(content)} chars")
+                return content
+
+    except Exception as e:
+        print(f"BeautifulSoup scraping failed: {type(e).__name__} - {e}")
+
+    # Method 4: Site-specific handlers for known problematic sites
+    try:
+        domain = urlparse(url).netloc
+        if 'reuters.com' in domain:
+            return scrape_reuters(soup)
+        elif 'bloomberg.com' in domain:
+            return scrape_bloomberg(soup)
+        # Add more site-specific handlers as needed
+    except Exception as e:
+        print(f"Site-specific scraping failed: {type(e).__name__} - {e}")
+
+    print("All scraping methods failed")
+    return None
+
+def scrape_reuters(soup):
+    """Custom handler for Reuters articles."""
+    paragraphs = soup.select('p.text__text__1FZLe')
+    if not paragraphs:
+        paragraphs = soup.select('.article-body p')
+    content = '\n\n'.join(p.get_text().strip() for p in paragraphs if len(p.get_text().strip()) > 40)
+    return content if len(content) > 200 else None
+
+def scrape_bloomberg(soup):
+    """Custom handler for Bloomberg articles."""
+    paragraphs = soup.select('.body-content p')
+    if not paragraphs:
+        paragraphs = soup.select('.body-copy p')
+    content = '\n\n'.join(p.get_text().strip() for p in paragraphs if len(p.get_text().strip()) > 40)
+    return content if len(content) > 200 else None
 
 # --- Helper: Call OpenAI ---
 def get_timeline_and_glossary(client: OpenAI, article_text: str, model_name: str = "gpt-4o"):
@@ -393,24 +474,25 @@ def process_and_store_articles():
                 article_content = None
                 content_source = "None"
 
-                # 1. Try newspaper3k scraping
-                scraped_text = scrape_article_text_newspaper(url)
-                if scraped_text:
-                    article_content = clean_article_content(scraped_text)  # Clean scraped content too
-                    content_source = "Scraped"
+                # Enhanced content retrieval with retries
+                max_retries = 3
+                retry_delay = 2  # seconds
                 
-                # 2. Try NewsAPI content
-                elif article_data.get('content'):
-                    cleaned_content = clean_article_content(article_data['content'])
-                    if cleaned_content:
-                        article_content = cleaned_content
-                        content_source = "API Content (Cleaned)"
-                
-                # 3. Fall back to description
-                elif article_data.get('description'):
-                    article_content = clean_article_content(article_data['description'])  # Clean description too
-                    content_source = "API Description"
-                
+                for attempt in range(max_retries):
+                    article_content = scrape_article_text_newspaper(url)
+                    if article_content and len(article_content) > 200:
+                        break
+                    if attempt < max_retries - 1:
+                        print(f"Retry {attempt + 1}/{max_retries} after {retry_delay}s...")
+                        time.sleep(retry_delay)
+
+                # Fallback to API content if scraping failed
+                if not article_content:
+                    if article_data.get('content'):
+                        article_content = clean_article_content(article_data['content'])
+                    elif article_data.get('description'):
+                        article_content = article_data['description']
+
                 if not article_content:
                     result['errors'].append(f"No content available for {url}")
                     continue
