@@ -526,3 +526,7 @@ footer { text-align: center; margin-top: 3em; padding: 1.5em; font-size: 0.85em;
     transform: translateY(0);
     box-shadow: 0 2px 4px rgba(13, 110, 253, 0.2);
 }
+
+#refresh-button {
+    display: none;
+}
