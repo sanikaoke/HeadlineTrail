@@ -22,7 +22,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const detailLinkContainer = document.getElementById('detail-link-container');
 
     // --- API URLs ---
-    const backendBaseUrl = '';
     const articlesUrl = `${backendBaseUrl}/api/articles`;
     const filterOptionsUrl = `${backendBaseUrl}/api/filter-options`;
 
