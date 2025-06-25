@@ -71,145 +71,112 @@ def format_date_for_display(date_obj):
 
 # --- Function to Query and Filter Data ---
 def query_articles(filters):
-    """Queries the DB and applies filters using Pandas."""
+    # --- Function to Query and Filter Data ---
+def query_articles(filters):
+    """Queries the DB using SQL and applies filters directly in the query."""
     conn = get_db_connection()
-    if not conn: return []
-    articles = []
+    if not conn:
+        return []
+
     try:
-        query = f"SELECT * FROM {TABLE_NAME}"
-        df = pd.read_sql_query(query, conn, index_col="original_url")
-        conn.close()
-        print(f"Fetched {len(df)} total rows.")
-        if df.empty: return []
+        # Base query
+        base_query = f"SELECT * FROM {TABLE_NAME}"
+        where_clauses = []
+        params = []
 
-        if 'published_at' in df.columns: df['published_at_dt'] = pd.to_datetime(df['published_at'], errors='coerce', utc=True)
-        else: df['published_at_dt'] = pd.NaT
-
-        filtered_df = df.copy()
-
-        # --- UPDATED Date Filter Logic ---
-        selected_month_str = filters.get('month')
-        selected_day_str = filters.get('day') # Keep as string initially
-        day_num = None
-        try:
-             if selected_day_str and selected_day_str != "All Days":
-                  day_num = int(selected_day_str)
-        except ValueError:
-             print(f"Warn: Invalid day value '{selected_day_str}' received.")
-
-        # Filter by Month ONLY if a specific month is selected
-        if selected_month_str and selected_month_str != "All Months":
-            try:
-                parts = selected_month_str.split(' - ')
-                year_num = int(parts[0])
-                month_name = parts[1]
-                month_num = datetime.strptime(month_name, "%B").month
-                if 'published_at_dt' in filtered_df.columns:
-                     date_mask = (filtered_df['published_at_dt'].dt.year == year_num) & \
-                                 (filtered_df['published_at_dt'].dt.month == month_num) & \
-                                 (filtered_df['published_at_dt'].notna())
-                     filtered_df = filtered_df[date_mask]
-                # Apply day filter *only if* month is also selected
-                if day_num is not None and not filtered_df.empty and 'published_at_dt' in filtered_df.columns:
-                     day_mask = (filtered_df['published_at_dt'].dt.day == day_num) & \
-                                (filtered_df['published_at_dt'].notna())
-                     filtered_df = filtered_df[day_mask]
-            except Exception as e: print(f"Warn: Month/Day filter error: {e}")
-        # Filter by Day ONLY if 'All Months' is selected but a specific day is chosen
-        elif day_num is not None: # Month is "All Months" but day is specific
-             if 'published_at_dt' in filtered_df.columns:
-                  day_mask = (filtered_df['published_at_dt'].dt.day == day_num) & \
-                             (filtered_df['published_at_dt'].notna())
-                  filtered_df = filtered_df[day_mask]
-        # --- End Date Filter ---
-
-        # Category Filter (Handles single category now)
+        # Category Filter
         selected_category = filters.get('category')
-        if not filtered_df.empty and selected_category and selected_category != "All Categories":
-            if "article_category" in filtered_df.columns:
-                 category_mask = filtered_df["article_category"] == selected_category # Direct comparison
-                 filtered_df = filtered_df[category_mask]
-            else: print("Warn: 'article_category' column not found for filtering.")
-
+        if selected_category and selected_category != "All Categories":
+            where_clauses.append("article_category = ?")
+            params.append(selected_category)
 
         # Search Query Filter
         search_query = filters.get('search')
-        if search_query and not filtered_df.empty:
-            search_query = search_query.lower()
-            try:
-                search_cols = ["original_title", "llm_generated_title", "article_description", "source", "article_content"]
-                cols_to_search = [col for col in search_cols if col in filtered_df.columns]
-                mask = pd.Series([False] * len(filtered_df), index=filtered_df.index)
-                for col in cols_to_search:
-                    # Ensure column exists and handle potential errors during string conversion/contains
-                    if col in filtered_df:
-                        mask = mask | filtered_df[col].astype(str).str.lower().str.contains(search_query, na=False)
-                filtered_df = filtered_df[mask]
-            except Exception as e: print(f"Warn: Search filter error: {e}")
+        if search_query:
+            search_term = f"%{search_query.lower()}%"
+            search_clause = """
+                (LOWER(original_title) LIKE ? OR 
+                 LOWER(llm_generated_title) LIKE ? OR 
+                 LOWER(article_description) LIKE ? OR 
+                 LOWER(source) LIKE ? OR 
+                 LOWER(article_content) LIKE ?)
+            """
+            where_clauses.append(search_clause)
+            params.extend([search_term] * 5)
 
-        # Sort
+        # Date Filter Logic
+        selected_month_str = filters.get('month')
+        selected_day_str = filters.get('day')
+
+        if selected_month_str and selected_month_str != "All Months":
+            where_clauses.append("strftime('%Y - %B', published_at_iso) = ?")
+            params.append(selected_month_str)
+        
+        if selected_day_str and selected_day_str != "All Days":
+            # This filters by the day number regardless of month if "All Months" is selected,
+            # or within a specific month if a month is selected.
+            where_clauses.append("strftime('%d', published_at_iso) = ?")
+            # Pad with leading zero if needed, e.g., '5' -> '05'
+            params.append(selected_day_str.zfill(2))
+
+        # Combine all WHERE clauses
+        if where_clauses:
+            base_query += " WHERE " + " AND ".join(where_clauses)
+            
+        # Sort Order
         sort_option = filters.get('sort_option', 'Newest First')
-        if not filtered_df.empty:
-            try:
-                sort_col, ascending, na_position = None, True, 'last'
-                if sort_option == "Newest First":
-                    sort_col, ascending = "published_at_dt", False
-                elif sort_option == "Oldest First":
-                    sort_col, ascending = "published_at_dt", True
-                elif sort_option == "A-Z":
-                    sort_col,ascending = "original_title", True
-                elif sort_option == "Z-A":
-                    sort_col, ascending = "original_title", False
+        if sort_option == "Newest First":
+            base_query += " ORDER BY published_at_iso DESC"
+        elif sort_option == "Oldest First":
+            base_query += " ORDER BY published_at_iso ASC"
+        elif sort_option == "A-Z":
+            base_query += " ORDER BY original_title ASC"
+        elif sort_option == "Z-A":
+            base_query += " ORDER BY original_title DESC"
 
-                # Fallback if primary sort column missing
-                if sort_col and sort_col not in filtered_df.columns:
-                     print(f"Warn: Sort column '{sort_col}' not found, defaulting to index.")
-                     sort_col = None # Reset to avoid error
-
-                if sort_col: # Sort if a valid column was determined
-                     filtered_df = filtered_df.sort_values(by=sort_col, ascending=ascending, na_position=na_position)
-                # else: keep original DB order (which was likely newest first)
-
-            except Exception as e: print(f"Warn: Sort error: {e}")
+        # Execute the query
+        cursor = conn.cursor()
+        cursor.execute(base_query, params)
+        rows = cursor.fetchall()
+        conn.close()
 
         # --- Prepare data for JSON response ---
         articles = []
-        for index_url, row in filtered_df.iterrows():
-             article_dict = row.to_dict() # Convert row Series to dict
-             def safe_json_loads(x):
-                  # Handles None, NaN, empty string, actual JSON, and bad JSON
-                  if pd.isna(x) or not isinstance(x, str) or x.strip() == "" or x == "N/A":
-                      return []
-                  try:
-                      loaded = json.loads(x)
-                      return loaded if isinstance(loaded, (list, dict)) else []
-                  except (json.JSONDecodeError, TypeError):
-                      print(f"Warn: Could not parse JSON: {x[:100]}...")
-                      return []
+        for row in rows:
+            article_dict = dict(row) # Convert sqlite3.Row to a dictionary
 
-             article_dict["historical_context"] = safe_json_loads(row.get("historical_context"))
-             article_dict["glossary"] = safe_json_loads(row.get("glossary"))
+            def safe_json_loads(x):
+                if not isinstance(x, str) or x.strip() == "" or x == "N/A":
+                    return []
+                try:
+                    return json.loads(x)
+                except (json.JSONDecodeError, TypeError):
+                    return []
 
-             # Ensure image url handling
-             img_url = article_dict.get(IMAGE_COLUMN_NAME)
-             if not img_url or pd.isna(img_url): article_dict[IMAGE_COLUMN_NAME] = DEFAULT_IMAGE
-             elif not isinstance(img_url, str) or not img_url.startswith('http'): article_dict[IMAGE_COLUMN_NAME] = DEFAULT_IMAGE
+            article_dict["historical_context"] = safe_json_loads(article_dict.get("historical_context"))
+            article_dict["glossary"] = safe_json_loads(article_dict.get("glossary"))
 
-             article_dict['published_at_formatted'] = format_date_for_display(row.get('published_at_dt'))
-             article_dict.pop('published_at_dt', None) # Remove datetime object before sending as JSON
-             article_dict['original_url'] = index_url # Ensure original URL (index) is in the dict
-             articles.append(article_dict)
+            img_url = article_dict.get(IMAGE_COLUMN_NAME)
+            if not img_url or not isinstance(img_url, str) or not img_url.startswith('http'):
+                article_dict[IMAGE_COLUMN_NAME] = DEFAULT_IMAGE
+
+            # Format date for display
+            try:
+                dt_obj = datetime.fromisoformat(article_dict['published_at_iso'].replace('Z', '+00:00'))
+                article_dict['published_at_formatted'] = format_date_for_display(dt_obj)
+            except (ValueError, TypeError):
+                article_dict['published_at_formatted'] = "Unknown Date"
+            
+            articles.append(article_dict)
 
         print(f"Returning {len(articles)} filtered/sorted articles.")
         return articles
 
     except Exception as e:
         print(f"Error querying/processing DB: {e}")
-        # Ensure connection closed even if error occurred after query
-        if conn and conn.in_transaction: conn.rollback() # Rollback if error occurred mid-transaction
-        if conn: conn.close()
-        return [] # Return empty list on error
-
+        if conn:
+            conn.close()
+        return []
 # --- API Endpoint for Articles ---
 @app.route('/articles', methods=['GET'])
 def get_articles():
