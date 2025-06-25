@@ -23,8 +23,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- API URLs ---
     const backendBaseUrl = '';
-    const articlesUrl = `${backendBaseUrl}/api/articles`;
-    const filterOptionsUrl = `${backendBaseUrl}/api/filter-options`;
+    const articlesUrl = '${backendBaseUrl}/api/articles';
+    const filterOptionsUrl = '${backendBaseUrl}/api/filter-options';
 
     // --- State ---
     let currentFilters = {
