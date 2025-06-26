@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from dotenv import load_dotenv
 import libsql_client
 
-print("--- Starting static site build ---")
+print("--- Starting static site build for Top 50 Articles---")
 
 # --- Load Environment Variables ---
 load_dotenv()
@@ -16,10 +16,10 @@ TABLE_NAME = "articles"
 IMAGE_COLUMN_NAME = "article_url_to_image"
 DEFAULT_IMAGE = "https://images.unsplash.com/photo-1586339949916-3e9457bef6d3?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=600&q=80"
 
-# --- Database Helper (using libsql_client directly) ---
+# --- Database Helper ---
 def create_db_client():
     if not TURSO_DATABASE_URL or not TURSO_AUTH_TOKEN:
-        raise Exception("Error: Missing Turso credentials in environment secrets.")
+        raise Exception("Error: Missing Turso credentials.")
     url = TURSO_DATABASE_URL.replace("libsql://", "https://")
     return libsql_client.create_client(url=url, auth_token=TURSO_AUTH_TOKEN)
 
@@ -46,13 +46,15 @@ async def build_site_async():
     client = create_db_client()
     
     try:
-        print("Fetching all articles...")
-        result_set = await client.execute(f"SELECT * FROM {TABLE_NAME} ORDER BY published_at_iso DESC")
-        articles_raw = rows_to_dict_list(result_set)
-        print(f"Found {len(articles_raw)} articles.")
+        print("Fetching Top 10 articles...")
+        # THIS IS THE KEY CHANGE: Added LIMIT 10 to the query
+        query = f"SELECT * FROM {TABLE_NAME} ORDER BY published_at_iso DESC LIMIT 1"
+        result_set = await client.execute(query)
+        articles = rows_to_dict_list(result_set)
+        print(f"Found {len(articles)} articles.")
 
-        articles = []
-        for article_dict in articles_raw:
+        # Format dates after fetching
+        for article_dict in articles:
             try:
                 iso_str = article_dict.get('published_at_iso', '')
                 if iso_str:
@@ -61,7 +63,6 @@ async def build_site_async():
                 else: article_dict['published_at_formatted'] = "Unknown Date"
             except Exception:
                 article_dict['published_at_formatted'] = "Unknown Date"
-            articles.append(article_dict)
 
         # --- Generate HTML for News Cards ---
         cards_html = ""
@@ -76,12 +77,12 @@ async def build_site_async():
                 article_id = article.get('original_url')
 
                 cards_html += f"""
-                <div class="news-card">
+                <div class="news-card" data-article-id="{article_id}">
                     <img src="{image_url}" alt="" onerror="this.onerror=null;this.src='{DEFAULT_IMAGE}';">
                     <div class="card-content">
                         <h6>{title}</h6>
                         <div class="caption">{source} | {date_str}</div>
-                        <button data-article-id="{article_id}">Read Article</button>
+                        <button>Read Article</button>
                     </div>
                 </div>
                 """
