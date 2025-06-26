@@ -63,115 +63,40 @@ def format_date_for_display(date_obj):
         return "Invalid Date"
 
 # --- Function to Query and Filter Data ---
+# --- DIAGNOSTIC TEST FUNCTION ---
 def query_articles(filters):
-    """Queries the DB using SQL and applies filters directly in the query."""
+    print("--- RUNNING DIAGNOSTIC TEST ---")
     conn = get_db_connection()
-    if not conn:
-        return []
+    if conn is None:
+        # Create a fake article to display the connection error
+        return [{
+            "original_title": "DIAGNOSTIC: DATABASE CONNECTION FAILED",
+            "source": "Please check Vercel Environment Variables for TURSO_DATABASE_URL and TURSO_AUTH_TOKEN.",
+            "article_url_to_image": "", "published_at_formatted": "Now"
+        }]
 
     try:
-        # Base query
-        base_query = f"SELECT * FROM {TABLE_NAME}"
-        where_clauses = []
-        params = []
-
-        # Category Filter
-        selected_category = filters.get('category')
-        if selected_category and selected_category != "All Categories":
-            where_clauses.append("article_category = ?")
-            params.append(selected_category)
-
-        # Search Query Filter
-        search_query = filters.get('search')
-        if search_query:
-            search_term = f"%{search_query.lower()}%"
-            search_clause = """
-                (LOWER(original_title) LIKE ? OR 
-                 LOWER(llm_generated_title) LIKE ? OR 
-                 LOWER(article_description) LIKE ? OR 
-                 LOWER(source) LIKE ? OR 
-                 LOWER(article_content) LIKE ?)
-            """
-            where_clauses.append(search_clause)
-            params.extend([search_term] * 5)
-
-        # Date Filter Logic
-        selected_month_str = filters.get('month')
-        selected_day_str = filters.get('day')
-
-        if selected_month_str and selected_month_str != "All Months":
-            where_clauses.append("strftime('%Y - %B', published_at_iso) = ?")
-            params.append(selected_month_str)
-        
-        if selected_day_str and selected_day_str != "All Days":
-            where_clauses.append("strftime('%d', published_at_iso) = ?")
-            params.append(selected_day_str.zfill(2))
-
-        # Combine all WHERE clauses
-        if where_clauses:
-            base_query += " WHERE " + " AND ".join(where_clauses)
-            
-        # Sort Order
-        sort_option = filters.get('sort_option', 'Newest First')
-        if sort_option == "Newest First":
-            base_query += " ORDER BY published_at_iso DESC"
-        elif sort_option == "Oldest First":
-            base_query += " ORDER BY published_at_iso ASC"
-        elif sort_option == "A-Z":
-            base_query += " ORDER BY original_title ASC"
-        elif sort_option == "Z-A":
-            base_query += " ORDER BY original_title DESC"
-
-        # Execute the query
         cursor = conn.cursor()
-        cursor.execute(base_query, params)
-        rows = cursor.fetchall()
+        # Ask the database for a simple count of articles
+        cursor.execute("SELECT COUNT(*) FROM articles;")
+        count = cursor.fetchone()[0]
         conn.close()
 
-        # --- Prepare data for JSON response ---
-        articles = []
-        for row in rows:
-            article_dict = dict(row)
-
-            def safe_json_loads(x):
-                if not isinstance(x, str) or x.strip() == "" or x == "N/A":
-                    return []
-                try:
-                    return json.loads(x)
-                except (json.JSONDecodeError, TypeError):
-                    return []
-
-            article_dict["historical_context"] = safe_json_loads(article_dict.get("historical_context"))
-            article_dict["glossary"] = safe_json_loads(article_dict.get("glossary"))
-
-            img_url = article_dict.get(IMAGE_COLUMN_NAME)
-            if not img_url or not isinstance(img_url, str) or not img_url.startswith('http'):
-                article_dict[IMAGE_COLUMN_NAME] = DEFAULT_IMAGE
-
-            try:
-                # Handle potential timezone 'Z' for ISO format
-                iso_str = article_dict.get('published_at_iso', '')
-                if iso_str:
-                    if iso_str.endswith('Z'):
-                        iso_str = iso_str[:-1] + '+00:00'
-                    dt_obj = datetime.fromisoformat(iso_str)
-                    article_dict['published_at_formatted'] = format_date_for_display(dt_obj)
-                else:
-                    article_dict['published_at_formatted'] = "Unknown Date"
-            except (ValueError, TypeError, KeyError):
-                article_dict['published_at_formatted'] = "Unknown Date"
-            
-            articles.append(article_dict)
-
-        print(f"Returning {len(articles)} filtered/sorted articles.")
-        return articles
-
+        # Create a single "fake" article to display the result
+        print(f"--- DIAGNOSTIC: Database has {count} articles. ---")
+        return [{
+            "original_title": f"DIAGNOSTIC: Found {count} Articles in Database",
+            "source": "This confirms Vercel can connect and count.",
+            "article_url_to_image": "", "published_at_formatted": "Now"
+        }]
     except Exception as e:
-        print(f"Error querying/processing DB: {e}")
-        if conn:
-            conn.close()
-        return []
-
+        # Create a fake article to display a query error
+        print(f"--- DIAGNOSTIC: QUERY FAILED: {e} ---")
+        return [{
+            "original_title": "DIAGNOSTIC: DATABASE QUERY FAILED",
+            "source": f"The error was: {e}",
+            "article_url_to_image": "", "published_at_formatted": "Now"
+        }]
 
 # --- API Endpoint for Articles ---
 @app.route('/articles', methods=['GET'])
