@@ -1,7 +1,7 @@
 import os
 import json
 import asyncio
-from datetime import datetime
+from datetime import datetime, timezone
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 from dotenv import load_dotenv
@@ -35,12 +35,18 @@ def format_date_for_display(date_obj):
     """Formats datetime object for display."""
     if not date_obj: return "Unknown Date"
     try:
-        if date_obj.tzinfo is not None: date_obj = date_obj.astimezone(None)
-        now = datetime.now()
+        # Make the current time timezone-aware (the fix is here)
+        now = datetime.now(timezone.utc)
+
+        # Ensure the article date is also timezone-aware before comparing
+        if date_obj.tzinfo is None:
+            date_obj = date_obj.replace(tzinfo=timezone.utc)
+
         delta = now - date_obj
         if delta.days == 0: return f"Today, {date_obj.strftime('%b %d')}"
         elif delta.days == 1: return f"Yesterday, {date_obj.strftime('%b %d')}"
-        else: return f"{delta.days} days ago"
+        elif delta.days < 7: return f"{delta.days} days ago"
+        else: return date_obj.strftime('%b %d, %Y')
     except Exception: return "Invalid Date"
 
 def rows_to_dict_list(rows):
