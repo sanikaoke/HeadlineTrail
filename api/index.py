@@ -1,5 +1,6 @@
 import os
 import json
+import asyncio
 from datetime import datetime
 from flask import Flask, jsonify, request
 from flask_cors import CORS
@@ -16,19 +17,14 @@ IMAGE_COLUMN_NAME = "article_url_to_image"
 DEFAULT_IMAGE = "https://images.unsplash.com/photo-1586339949916-3e9457bef6d3?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=600&q=80"
 
 # --- Database Helper ---
-def get_db_client():
+def create_db_client():
     """Creates a direct client connection to the Turso cloud database."""
     url = os.getenv("TURSO_DATABASE_URL")
     auth_token = os.getenv("TURSO_AUTH_TOKEN")
     if not url or not auth_token:
-        print("DATABASE ERROR: Missing Turso credentials in environment variables.")
+        print("DATABASE ERROR: Missing Turso credentials.")
         return None
-    try:
-        # This is the new, direct way to connect using the official library
-        return libsql_client.create_client(url=url, auth_token=auth_token)
-    except Exception as e:
-        print(f"Database connection error: {e}")
-        return None
+    return libsql_client.create_client(url=url, auth_token=auth_token)
 
 # --- Date Formatting Helper ---
 def format_date_for_display(date_obj):
@@ -40,8 +36,7 @@ def format_date_for_display(date_obj):
         delta = now - date_obj
         if delta.days == 0: return f"Today, {date_obj.strftime('%b %d')}"
         elif delta.days == 1: return f"Yesterday, {date_obj.strftime('%b %d')}"
-        elif delta.days < 7: return f"{delta.days} days ago"
-        else: return date_obj.strftime('%b %d, %Y')
+        else: return f"{delta.days} days ago"
     except Exception: return "Invalid Date"
 
 def rows_to_dict_list(rows):
@@ -49,9 +44,9 @@ def rows_to_dict_list(rows):
     return [dict(zip(rows.columns, row)) for row in rows]
 
 # --- Main Functions ---
-def query_articles(filters):
-    """Queries the DB using the libsql client."""
-    client = get_db_client()
+async def query_articles_async(filters):
+    """Async function to query the DB using the libsql client."""
+    client = create_db_client()
     if not client: return []
     try:
         base_query, params = f"SELECT * FROM {TABLE_NAME}", []
@@ -70,7 +65,7 @@ def query_articles(filters):
         sort_map = {"Newest First": "published_at_iso DESC", "Oldest First": "published_at_iso ASC", "A-Z": "original_title ASC", "Z-A": "original_title DESC"}
         base_query += f" ORDER BY {sort_map.get(filters.get('sort_option', 'Newest First'))}"
         
-        result_set = client.execute(base_query, params)
+        result_set = await client.execute(base_query, params)
         articles = rows_to_dict_list(result_set)
 
         for article_dict in articles:
@@ -89,26 +84,18 @@ def query_articles(filters):
                 else: article_dict['published_at_formatted'] = "Unknown Date"
             except Exception: article_dict['published_at_formatted'] = "Unknown Date"
         return articles
-    except Exception as e:
-        print(f"Query Error: {e}")
-        return []
+    finally:
+        if client: await client.close()
 
-@app.route('/articles', methods=['GET'])
-def get_articles():
-    filters = {k: v for k, v in request.args.items()}
-    articles_data = query_articles(filters)
-    return jsonify(articles_data)
-
-@app.route('/filter-options', methods=['GET'])
-def get_filter_options():
-    client = get_db_client()
-    if not client: return jsonify({"error": "DB connection failed"}), 500
+async def get_filter_options_async():
+    client = create_db_client()
+    if not client: return {"error": "DB connection failed"}
     options = {"categories": ["All Categories"], "months": ["All Months"], "days_by_month": {"All Months": ["All Days"]}, "all_unique_days": ["All Days"]}
     try:
-        cat_rows = client.execute(f"SELECT DISTINCT article_category FROM {TABLE_NAME} WHERE article_category IS NOT NULL AND article_category != ''")
+        cat_rows = await client.execute(f"SELECT DISTINCT article_category FROM {TABLE_NAME} WHERE article_category IS NOT NULL AND article_category != ''")
         options["categories"].extend(sorted(list(set([row[0] for row in cat_rows if row[0]]))))
         
-        date_rows = client.execute(f"SELECT DISTINCT published_at_iso FROM {TABLE_NAME} WHERE published_at_iso IS NOT NULL AND published_at_iso != ''")
+        date_rows = await client.execute(f"SELECT DISTINCT published_at_iso FROM {TABLE_NAME} WHERE published_at_iso IS NOT NULL AND published_at_iso != ''")
         dates_str = [row[0] for row in date_rows]
         if dates_str:
             all_dates = []
@@ -121,13 +108,28 @@ def get_filter_options():
                 options["months"].extend(sorted(list(set([d.strftime('%Y - %B') for d in all_dates])), key=lambda d: datetime.strptime(d, '%Y - %B'), reverse=True))
                 days_by_month_dict = {}
                 for d in all_dates:
-                    ym_str = d.strftime('%Y - %B')
+                    ym_str = d.strftime('%Y - %B');
                     if ym_str not in days_by_month_dict: days_by_month_dict[ym_str] = set()
                     days_by_month_dict[ym_str].add(str(d.day))
                 for ym_str, days_set in days_by_month_dict.items():
                     options["days_by_month"][ym_str] = ["All Days"] + sorted(list(days_set), key=int)
                 options["all_unique_days"].extend(sorted(list(set([str(d.day) for d in all_dates])), key=int))
-        return jsonify(options)
-    except Exception as e:
-        print(f"Filter options error: {e}")
-        return jsonify({"error": f"Filter options error: {e}"}), 500
+        return options
+    finally:
+        if client: await client.close()
+
+# --- API Endpoints ---
+@app.route('/articles', methods=['GET'])
+def get_articles():
+    filters = {k: v for k, v in request.args.items()}
+    # Run the async function from our sync (Flask) context
+    articles_data = asyncio.run(query_articles_async(filters))
+    return jsonify(articles_data)
+
+@app.route('/filter-options', methods=['GET'])
+def get_filter_options():
+    # Run the async function from our sync (Flask) context
+    options = asyncio.run(get_filter_options_async())
+    if "error" in options:
+        return jsonify(options), 500
+    return jsonify(options)
