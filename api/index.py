@@ -159,7 +159,7 @@ def query_articles(filters):
         return []
 
 # --- API Endpoint for Articles ---
-@app.route('/api/articles', methods=['GET'])
+@app.route('/articles', methods=['GET'])
 def get_articles():
     """Endpoint to fetch articles, accepts filter params."""
     filters = {
@@ -173,7 +173,7 @@ def get_articles():
     return jsonify(articles_data)
 
 # --- API Endpoint for Filter Options ---
-@app.route('/api/filter-options', methods=['GET'])
+@app.route('/filter-options', methods=['GET'])
 def get_filter_options():
     """Endpoint to get available categories, date ranges, and all unique days."""
     conn = get_db_connection()
@@ -212,8 +212,3 @@ def get_filter_options():
     finally:
         if conn:
             conn.close()
-
-# Disabling the fetch-latest-news endpoint for Vercel deployment
-@app.route('/api/fetch-latest-news', methods=['POST'])
-def fetch_latest_news():
-    return jsonify({'success': False, 'message': 'This feature is disabled on the live version.'}), 403
