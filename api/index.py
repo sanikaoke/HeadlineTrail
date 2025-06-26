@@ -22,8 +22,12 @@ def create_db_client():
     url = os.getenv("TURSO_DATABASE_URL")
     auth_token = os.getenv("TURSO_AUTH_TOKEN")
     if not url or not auth_token:
-        print("DATABASE ERROR: Missing Turso credentials.")
+        print("DATABASE ERROR: Missing Turso credentials in environment variables.")
         return None
+    
+    # This is the new line that fixes the connection protocol
+    url = url.replace("libsql://", "https://")
+
     return libsql_client.create_client(url=url, auth_token=auth_token)
 
 # --- Date Formatting Helper ---
