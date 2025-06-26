@@ -23,9 +23,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- API URLs ---
     // --- API URLs ---
-    const backendBaseUrl = '';
-    const articlesUrl = `${backendBaseUrl}/api/articles`;
-    const filterOptionsUrl = `${backendBaseUrl}/api/filter-options`;
+    const backendBaseUrl = 'https://headlinetrail.onrender.com';
+    const articlesUrl = `${backendBaseUrl}/articles`;
+    const filterOptionsUrl = `${backendBaseUrl}/filter-options`;
 
     // --- State ---
     let currentFilters = {
