@@ -123,7 +123,7 @@ def query_articles(filters):
             conn.close()
 
 # --- API Endpoint for Articles ---
-@app.route('/articles', methods=['GET'])
+@app.route('/api/articles', methods=['GET'])
 def get_articles():
     """Endpoint to fetch articles, accepts filter params."""
     filters = {
@@ -137,7 +137,7 @@ def get_articles():
     return jsonify(articles_data)
 
 # --- API Endpoint for Filter Options ---
-@app.route('/filter-options', methods=['GET'])
+@app.route('/api/filter-options', methods=['GET'])
 def get_filter_options():
     """Endpoint to get available categories, date ranges, and all unique days."""
     conn = get_db_connection()
