@@ -1,10 +1,10 @@
 Flask
 flask_cors
 requests
-python-dotenv
 openai
 pydantic
 newspaper3k
 beautifulsoup4
 libsql-client
 gunicorn
+python-dotenv
