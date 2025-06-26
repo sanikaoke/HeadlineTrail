@@ -22,26 +22,26 @@ def create_db_client():
     url = os.getenv("TURSO_DATABASE_URL")
     auth_token = os.getenv("TURSO_AUTH_TOKEN")
     if not url or not auth_token:
-        print("DATABASE ERROR: Missing Turso credentials in environment variables.")
+        print("DATABASE ERROR: Missing Turso credentials.")
         return None
-    
-    # This is the new line that fixes the connection protocol
-    url = url.replace("libsql://", "https://")
-
-    return libsql_client.create_client(url=url, auth_token=auth_token)
+    try:
+        # This replaces libsql:// with https:// to fix the handshake error
+        url = url.replace("libsql://", "https://")
+        return libsql_client.create_client(url=url, auth_token=auth_token)
+    except Exception as e:
+        print(f"Database connection error: {e}")
+        return None
 
 # --- Date Formatting Helper ---
 def format_date_for_display(date_obj):
     """Formats datetime object for display."""
     if not date_obj: return "Unknown Date"
     try:
-        # Make the current time timezone-aware (the fix is here)
+        # Make the current time timezone-aware
         now = datetime.now(timezone.utc)
-
         # Ensure the article date is also timezone-aware before comparing
         if date_obj.tzinfo is None:
             date_obj = date_obj.replace(tzinfo=timezone.utc)
-
         delta = now - date_obj
         if delta.days == 0: return f"Today, {date_obj.strftime('%b %d')}"
         elif delta.days == 1: return f"Yesterday, {date_obj.strftime('%b %d')}"
@@ -51,6 +51,7 @@ def format_date_for_display(date_obj):
 
 def rows_to_dict_list(rows):
     """Converts a list of rows from the client into a list of dictionaries."""
+    if not rows: return []
     return [dict(zip(rows.columns, row)) for row in rows]
 
 # --- Main Functions ---
@@ -65,8 +66,8 @@ async def query_articles_async(filters):
             where_clauses.append("article_category = ?"); params.append(filters['category'])
         if filters.get('search'):
             search_term = f"%{filters['search'].lower()}%"
-            where_clauses.append("(LOWER(original_title) LIKE ? OR LOWER(article_description) LIKE ? OR LOWER(source) LIKE ?)")
-            params.extend([search_term] * 3)
+            where_clauses.append("(LOWER(original_title) LIKE ? OR LOWER(llm_generated_title) LIKE ? OR LOWER(article_description) LIKE ? OR LOWER(source) LIKE ? OR LOWER(article_content) LIKE ?)")
+            params.extend([search_term] * 5)
         if filters.get('month') and filters['month'] != "All Months":
             where_clauses.append("strftime('%Y - %B', published_at_iso) = ?"); params.append(filters['month'])
         if filters.get('day') and filters['day'] != "All Days":
@@ -132,13 +133,11 @@ async def get_filter_options_async():
 @app.route('/articles', methods=['GET'])
 def get_articles():
     filters = {k: v for k, v in request.args.items()}
-    # Run the async function from our sync (Flask) context
     articles_data = asyncio.run(query_articles_async(filters))
     return jsonify(articles_data)
 
 @app.route('/filter-options', methods=['GET'])
 def get_filter_options():
-    # Run the async function from our sync (Flask) context
     options = asyncio.run(get_filter_options_async())
     if "error" in options:
         return jsonify(options), 500
