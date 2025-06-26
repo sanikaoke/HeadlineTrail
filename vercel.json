@@ -1,0 +1,6 @@
+{
+  "outputDirectory": "public",
+  "engines": {
+    "python": "3.9"
+  }
+}
