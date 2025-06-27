@@ -22,7 +22,8 @@ ARTICLES_TO_BUILD = 20
 def create_db_client():
     if not TURSO_DATABASE_URL or not TURSO_AUTH_TOKEN:
         raise Exception("Error: Missing Turso credentials.")
-    url = TURSO_DATABASE_URL.replace("libsql://", "httpshttps://")
+    # This is the corrected line
+    url = TURSO_DATABASE_URL.replace("libsql://", "https://")
     return libsql_client.create_client(url=url, auth_token=TURSO_AUTH_TOKEN)
 
 # --- Date Formatting Helper ---
@@ -43,7 +44,7 @@ def rows_to_dict_list(rows):
 
 def create_slug(text):
     """Creates a URL-friendly slug from a title."""
-    text = text.lower()
+    text = str(text).lower()
     text = re.sub(r'[\s\W]+', '-', text) # Replace spaces and non-word characters with a dash
     return text.strip('-')[:80] # Limit length
 
@@ -104,6 +105,15 @@ async def build_site_async():
 
         # --- Generate Individual Article Pages ---
         for article in articles:
+            # This logic needs the original date string formatting
+            iso_str = article.get('published_at_iso', '')
+            date_str = "Unknown Date"
+            if iso_str:
+                try:
+                    if iso_str.endswith('Z'): iso_str = iso_str[:-1] + '+00:00'
+                    date_str = format_date_for_display(datetime.fromisoformat(iso_str))
+                except Exception: pass
+
             # Generate timeline HTML
             timeline_html = "<p>No timeline entries available.</p>"
             timeline_data = json.loads(article.get('historical_context') or '[]')
@@ -126,10 +136,10 @@ async def build_site_async():
                 read_more_html = f'<a href="{article.get("original_url")}" class="read-more-button" target="_blank" rel="noopener noreferrer">📰 Read Full Article Online</a>'
 
             # Replace placeholders in the detail template
-            article_page_html = detail_template.replace("", article.get('original_title', 'Untitled'))
+            article_page_html = detail_template.replace("", str(article.get('original_title', 'Untitled')))
             article_page_html = article_page_html.replace("", f"Source: {article.get('source', 'Unknown')} | Published: {date_str}")
             article_page_html = article_page_html.replace("", f'<img id="detail-image" src="{article.get(IMAGE_COLUMN_NAME) or DEFAULT_IMAGE}" alt="Article Image" onerror="this.onerror=null;this.src=\'{DEFAULT_IMAGE}\';">')
-            article_page_html = article_page_html.replace("", article.get('article_content', 'Content not available.'))
+            article_page_html = article_page_html.replace("", str(article.get('article_content', 'Content not available.')))
             article_page_html = article_page_html.replace("", timeline_html)
             article_page_html = article_page_html.replace("", glossary_html)
             article_page_html = article_page_html.replace("", read_more_html)
