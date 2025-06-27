@@ -22,7 +22,6 @@ ARTICLES_TO_BUILD = 20
 def create_db_client():
     if not TURSO_DATABASE_URL or not TURSO_AUTH_TOKEN:
         raise Exception("Error: Missing Turso credentials.")
-    # This is the corrected line
     url = TURSO_DATABASE_URL.replace("libsql://", "https://")
     return libsql_client.create_client(url=url, auth_token=TURSO_AUTH_TOKEN)
 
@@ -45,8 +44,8 @@ def rows_to_dict_list(rows):
 def create_slug(text):
     """Creates a URL-friendly slug from a title."""
     text = str(text).lower()
-    text = re.sub(r'[\s\W]+', '-', text) # Replace spaces and non-word characters with a dash
-    return text.strip('-')[:80] # Limit length
+    text = re.sub(r'[\s\W]+', '-', text) 
+    return text.strip('-')[:80] 
 
 # --- Main Async Build Logic ---
 async def build_site_async():
@@ -70,29 +69,24 @@ async def build_site_async():
         # --- Generate Index Page ---
         cards_html = ""
         for article in articles:
-            # Prepare data for the card
-            image_url = article.get(IMAGE_COLUMN_NAME) or DEFAULT_IMAGE
-            title = str(article.get('original_title', 'Untitled')).replace('<', '&lt;').replace('>', '&gt;')
-            source = str(article.get('source', 'Unknown')).replace('<', '&lt;').replace('>', '&gt;')
-            
-            iso_str = article.get('published_at_iso', '')
             date_str = "Unknown Date"
+            iso_str = article.get('published_at_iso', '')
             if iso_str:
                 try:
                     if iso_str.endswith('Z'): iso_str = iso_str[:-1] + '+00:00'
                     date_str = format_date_for_display(datetime.fromisoformat(iso_str))
                 except Exception: pass
             
-            slug = create_slug(title)
+            slug = create_slug(article.get('original_title', 'Untitled'))
             detail_page_url = f"/articles/{slug}.html"
 
             cards_html += f"""
             <div class="news-card">
                 <a href="{detail_page_url}" class="card-link-wrapper">
-                    <img src="{image_url}" alt="" onerror="this.onerror=null;this.src='{DEFAULT_IMAGE}';">
+                    <img src="{article.get(IMAGE_COLUMN_NAME) or DEFAULT_IMAGE}" alt="" onerror="this.onerror=null;this.src='{DEFAULT_IMAGE}';">
                     <div class="card-content">
-                        <h6>{title}</h6>
-                        <div class="caption">{source} | {date_str}</div>
+                        <h6>{str(article.get('original_title', 'Untitled')).replace('<', '&lt;').replace('>', '&gt;')}</h6>
+                        <div class="caption">{str(article.get('source', 'Unknown')).replace('<', '&lt;').replace('>', '&gt;')} | {date_str}</div>
                     </div>
                 </a>
             </div>
@@ -105,16 +99,15 @@ async def build_site_async():
 
         # --- Generate Individual Article Pages ---
         for article in articles:
-            # This logic needs the original date string formatting
-            iso_str = article.get('published_at_iso', '')
+            # Re-calculate date string for each article
             date_str = "Unknown Date"
+            iso_str = article.get('published_at_iso', '')
             if iso_str:
                 try:
                     if iso_str.endswith('Z'): iso_str = iso_str[:-1] + '+00:00'
                     date_str = format_date_for_display(datetime.fromisoformat(iso_str))
                 except Exception: pass
 
-            # Generate timeline HTML
             timeline_html = "<p>No timeline entries available.</p>"
             timeline_data = json.loads(article.get('historical_context') or '[]')
             if timeline_data:
@@ -122,7 +115,6 @@ async def build_site_async():
                 for entry in timeline_data:
                     timeline_html += f"<div><p><strong>{entry.get('year', '?')}: {entry.get('title', 'Event')}</strong></p><p style='margin-top: 0.2em;'>{entry.get('summary', '')}</p></div>"
 
-            # Generate glossary HTML
             glossary_html = "<p>No glossary terms available.</p>"
             glossary_data = json.loads(article.get('glossary') or '[]')
             if glossary_data:
@@ -130,12 +122,11 @@ async def build_site_async():
                 for entry in glossary_data:
                     glossary_html += f"<div><strong>{entry.get('word', '?')}:</strong> {entry.get('definition', '')}</div>"
 
-            # Generate Read More button HTML
             read_more_html = ""
             if article.get('original_url'):
                 read_more_html = f'<a href="{article.get("original_url")}" class="read-more-button" target="_blank" rel="noopener noreferrer">📰 Read Full Article Online</a>'
 
-            # Replace placeholders in the detail template
+            # This is the corrected section with proper placeholders
             article_page_html = detail_template.replace("", str(article.get('original_title', 'Untitled')))
             article_page_html = article_page_html.replace("", f"Source: {article.get('source', 'Unknown')} | Published: {date_str}")
             article_page_html = article_page_html.replace("", f'<img id="detail-image" src="{article.get(IMAGE_COLUMN_NAME) or DEFAULT_IMAGE}" alt="Article Image" onerror="this.onerror=null;this.src=\'{DEFAULT_IMAGE}\';">')
@@ -144,14 +135,12 @@ async def build_site_async():
             article_page_html = article_page_html.replace("", glossary_html)
             article_page_html = article_page_html.replace("", read_more_html)
 
-            # Save the new file
             slug = create_slug(article.get('original_title', 'Untitled'))
             with open(f"public/articles/{slug}.html", "w", encoding="utf-8") as f:
                 f.write(article_page_html)
 
         print(f"Generated {len(articles)} individual article pages.")
         
-        # --- Copy static assets ---
         shutil.copy('style.css', 'public/style.css')
         shutil.copy('script.js', 'public/script.js')
 
