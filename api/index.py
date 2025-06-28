@@ -3,17 +3,14 @@ import json
 import asyncio
 from datetime import datetime, timezone
 from flask import Flask, jsonify, request
-from flask_cors import CORS # Re-importing the CORS library
+# We no longer need the Flask-Cors library
 from dotenv import load_dotenv
 import libsql_client
 
 app = Flask(__name__)
 
-# --- THIS IS THE FINAL FIX ---
-# This correctly initializes the CORS extension to allow all origins.
-# This is the standard and most reliable way to handle this.
-CORS(app)
-# --- END OF FINAL FIX ---
+# NOTE: We are no longer using any CORS library or decorator.
+# We will add the required header manually in each route.
 
 TABLE_NAME = "articles"
 IMAGE_COLUMN_NAME = "article_url_to_image"
@@ -29,7 +26,6 @@ def create_db_client():
     return libsql_client.create_client(url=url, auth_token=auth_token)
 
 def format_date_for_display(date_obj):
-    """Formats datetime object to always show a full date."""
     if not date_obj: return "Unknown Date"
     try:
         return date_obj.strftime('%b %d, %Y')
@@ -101,10 +97,22 @@ async def get_filter_options_async():
 def get_articles():
     filters = {'search': request.args.get('search'), 'sort_option': request.args.get('sort'), 'month': request.args.get('month'), 'category': request.args.get('category')}
     articles_data = asyncio.run(query_articles_async(filters))
-    return jsonify(articles_data)
+    
+    # Manually create the response and add the permission header
+    response = jsonify(articles_data)
+    response.headers.add('Access-Control-Allow-Origin', '*')
+    return response
 
 @app.route('/filter-options', methods=['GET'])
 def get_filter_options():
     options = asyncio.run(get_filter_options_async())
-    if "error" in options: return jsonify(options), 500
-    return jsonify(options)
+    
+    # Manually create the response and add the permission header
+    if "error" in options:
+        response = jsonify(options)
+        response.status_code = 500
+    else:
+        response = jsonify(options)
+    
+    response.headers.add('Access-Control-Allow-Origin', '*')
+    return response
