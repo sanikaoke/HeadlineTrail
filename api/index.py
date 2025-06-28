@@ -9,17 +9,8 @@ import libsql_client
 
 app = Flask(__name__)
 
-# --- THIS IS THE FINAL FIX ---
-# This function manually adds the required CORS headers to every response.
-# It runs after each request is handled by a route.
-@app.after_request
-def after_request(response):
-    header = response.headers
-    header['Access-Control-Allow-Origin'] = '*'
-    header['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
-    header['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS, PUT, PATCH, DELETE'
-    return response
-# --- END OF FINAL FIX ---
+# NOTE: We are no longer using the CORS library or the @app.after_request decorator.
+# We will add headers manually to each route.
 
 TABLE_NAME = "articles"
 IMAGE_COLUMN_NAME = "article_url_to_image"
@@ -107,10 +98,22 @@ async def get_filter_options_async():
 def get_articles():
     filters = {'search': request.args.get('search'), 'sort_option': request.args.get('sort'), 'month': request.args.get('month'), 'category': request.args.get('category')}
     articles_data = asyncio.run(query_articles_async(filters))
-    return jsonify(articles_data)
+    
+    # Manually create the response and add the header
+    response = jsonify(articles_data)
+    response.headers.add('Access-Control-Allow-Origin', '*')
+    return response
 
 @app.route('/filter-options', methods=['GET'])
 def get_filter_options():
     options = asyncio.run(get_filter_options_async())
-    if "error" in options: return jsonify(options), 500
-    return jsonify(options)
+    
+    # Manually create the response and add the header
+    if "error" in options:
+        response = jsonify(options)
+        response.status_code = 500
+    else:
+        response = jsonify(options)
+    
+    response.headers.add('Access-Control-Allow-Origin', '*')
+    return response
