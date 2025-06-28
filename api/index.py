@@ -3,14 +3,17 @@ import json
 import asyncio
 from datetime import datetime, timezone
 from flask import Flask, jsonify, request
-# We no longer need flask_cors
+from flask_cors import CORS # Re-importing the CORS library
 from dotenv import load_dotenv
 import libsql_client
 
 app = Flask(__name__)
 
-# NOTE: We are no longer using the CORS library or the @app.after_request decorator.
-# We will add headers manually to each route.
+# --- THIS IS THE FINAL FIX ---
+# This correctly initializes the CORS extension to allow all origins.
+# This is the standard and most reliable way to handle this.
+CORS(app)
+# --- END OF FINAL FIX ---
 
 TABLE_NAME = "articles"
 IMAGE_COLUMN_NAME = "article_url_to_image"
@@ -98,22 +101,10 @@ async def get_filter_options_async():
 def get_articles():
     filters = {'search': request.args.get('search'), 'sort_option': request.args.get('sort'), 'month': request.args.get('month'), 'category': request.args.get('category')}
     articles_data = asyncio.run(query_articles_async(filters))
-    
-    # Manually create the response and add the header
-    response = jsonify(articles_data)
-    response.headers.add('Access-Control-Allow-Origin', '*')
-    return response
+    return jsonify(articles_data)
 
 @app.route('/filter-options', methods=['GET'])
 def get_filter_options():
     options = asyncio.run(get_filter_options_async())
-    
-    # Manually create the response and add the header
-    if "error" in options:
-        response = jsonify(options)
-        response.status_code = 500
-    else:
-        response = jsonify(options)
-    
-    response.headers.add('Access-Control-Allow-Origin', '*')
-    return response
+    if "error" in options: return jsonify(options), 500
+    return jsonify(options)
