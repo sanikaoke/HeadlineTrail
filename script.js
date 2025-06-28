@@ -135,8 +135,7 @@ document.addEventListener('DOMContentLoaded', () => {
         detailImage.style.display = 'block';
         detailContent.textContent = article.article_content || 'Content not available.';
 
-        // --- Logic to create the "Read Article Online" button ---
-        detailLinkContainer.innerHTML = ''; // Clear it first
+        detailLinkContainer.innerHTML = ''; 
         if (article.original_url && article.original_url !== '#') {
             const linkButton = document.createElement('a');
             linkButton.href = article.original_url;
@@ -166,12 +165,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function handleFilterChange() {
-        // Simplified filter state, no 'day'
         currentFilters = { search: searchInput.value, sort_option: sortSelect.value, category: categorySelect.value, month: monthSelect.value };
         fetchAndRenderArticles(currentFilters);
     }
     
-    // Simplified event listeners
     [searchInput, sortSelect, categorySelect, monthSelect].forEach(el => {
         el.addEventListener('change', handleFilterChange);
     });
