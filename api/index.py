@@ -3,17 +3,12 @@ import json
 import asyncio
 from datetime import datetime, timezone
 from flask import Flask, jsonify, request
-from flask_cors import CORS # Re-import the CORS library
+from flask_cors import CORS
 from dotenv import load_dotenv
 import libsql_client
 
 app = Flask(__name__)
-
-# --- THIS IS THE FINAL FIX ---
-# This correctly initializes the CORS extension to handle all requests,
-# including the preflight OPTIONS requests that were causing the error.
 CORS(app)
-# --- END OF FINAL FIX ---
 
 TABLE_NAME = "articles"
 IMAGE_COLUMN_NAME = "article_url_to_image"
@@ -29,12 +24,15 @@ def create_db_client():
     return libsql_client.create_client(url=url, auth_token=auth_token)
 
 def format_date_for_display(date_obj):
-    """Formats datetime object to always show a full date."""
     if not date_obj: return "Unknown Date"
     try:
-        return date_obj.strftime('%b %d, %Y')
-    except Exception:
-        return "Invalid Date"
+        now = datetime.now(timezone.utc)
+        if date_obj.tzinfo is None: date_obj = date_obj.replace(tzinfo=timezone.utc)
+        delta = now - date_obj
+        if delta.days == 0: return f"Today, {date_obj.strftime('%b %d')}"
+        elif delta.days == 1: return f"Yesterday, {date_obj.strftime('%b %d')}"
+        else: return f"{delta.days} days ago"
+    except Exception: return "Invalid Date"
 
 def rows_to_dict_list(rows):
     if not rows: return []
@@ -54,12 +52,13 @@ async def query_articles_async(filters):
             params.extend([search_term] * 5)
         if filters.get('month') and filters['month'] != "All Months":
             where_clauses.append("strftime('%Y - %B', published_at_iso) = ?"); params.append(filters['month'])
-        
         if where_clauses: base_query += " WHERE " + " AND ".join(where_clauses)
         
         sort_map = {"Newest First": "published_at_iso DESC", "Oldest First": "published_at_iso ASC", "A-Z": "original_title ASC", "Z-A": "original_title DESC"}
         sort_order = sort_map.get(filters.get('sort_option'), "published_at_iso DESC")
-        base_query += f" ORDER BY {sort_order} LIMIT 50"
+        
+        # THIS IS THE CHANGED LINE: The "LIMIT 50" has been removed.
+        base_query += f" ORDER BY {sort_order}"
         
         result_set = await client.execute(base_query, params)
         articles = rows_to_dict_list(result_set)
@@ -75,8 +74,7 @@ async def query_articles_async(filters):
                 iso_str = article_dict.get('published_at_iso', '')
                 if iso_str:
                     if iso_str.endswith('Z'): iso_str = iso_str[:-1] + '+00:00'
-                    dt_obj = datetime.fromisoformat(iso_str)
-                    article_dict['published_at_formatted'] = format_date_for_display(dt_obj)
+                    article_dict['published_at_formatted'] = format_date_for_display(datetime.fromisoformat(iso_str))
                 else: article_dict['published_at_formatted'] = "Unknown Date"
             except Exception: article_dict['published_at_formatted'] = "Unknown Date"
         return articles
@@ -90,7 +88,6 @@ async def get_filter_options_async():
     try:
         cat_rows = await client.execute(f"SELECT DISTINCT article_category FROM {TABLE_NAME} WHERE article_category IS NOT NULL AND article_category != ''")
         options["categories"].extend(sorted(list(set([row[0] for row in cat_rows if row[0]]))))
-        
         date_rows = await client.execute(f"SELECT DISTINCT strftime('%Y - %B', published_at_iso) as month FROM {TABLE_NAME} WHERE published_at_iso IS NOT NULL AND published_at_iso != '' ORDER BY published_at_iso DESC")
         options["months"].extend([row[0] for row in date_rows if row[0]])
         return options
@@ -99,7 +96,7 @@ async def get_filter_options_async():
 
 @app.route('/articles', methods=['GET'])
 def get_articles():
-    filters = {'search': request.args.get('search'), 'sort_option': request.args.get('sort'), 'month': request.args.get('month'), 'category': request.args.get('category')}
+    filters = {k: v for k, v in request.args.items()}
     articles_data = asyncio.run(query_articles_async(filters))
     return jsonify(articles_data)
 
