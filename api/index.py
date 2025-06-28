@@ -3,15 +3,22 @@ import json
 import asyncio
 from datetime import datetime, timezone
 from flask import Flask, jsonify, request
-from flask_cors import CORS # Import CORS
+# We no longer need flask_cors
 from dotenv import load_dotenv
 import libsql_client
 
 app = Flask(__name__)
 
 # --- THIS IS THE FINAL FIX ---
-# This explicitly tells the server to allow requests from any origin.
-CORS(app, resources={r"/*": {"origins": "*"}})
+# This function manually adds the required CORS headers to every response.
+# It runs after each request is handled by a route.
+@app.after_request
+def after_request(response):
+    header = response.headers
+    header['Access-Control-Allow-Origin'] = '*'
+    header['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
+    header['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS, PUT, PATCH, DELETE'
+    return response
 # --- END OF FINAL FIX ---
 
 TABLE_NAME = "articles"
@@ -27,7 +34,6 @@ def create_db_client():
     url = url.replace("libsql://", "https://")
     return libsql_client.create_client(url=url, auth_token=auth_token)
 
-# --- MODIFIED DATE FUNCTION ---
 def format_date_for_display(date_obj):
     """Formats datetime object to always show a full date."""
     if not date_obj: return "Unknown Date"
