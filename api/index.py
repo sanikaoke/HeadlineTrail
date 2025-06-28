@@ -3,12 +3,16 @@ import json
 import asyncio
 from datetime import datetime, timezone
 from flask import Flask, jsonify, request
-from flask_cors import CORS
+from flask_cors import CORS # Import CORS
 from dotenv import load_dotenv
 import libsql_client
 
 app = Flask(__name__)
-CORS(app)
+
+# --- THIS IS THE FINAL FIX ---
+# This explicitly tells the server to allow requests from any origin.
+CORS(app, resources={r"/*": {"origins": "*"}})
+# --- END OF FINAL FIX ---
 
 TABLE_NAME = "articles"
 IMAGE_COLUMN_NAME = "article_url_to_image"
@@ -28,7 +32,6 @@ def format_date_for_display(date_obj):
     """Formats datetime object to always show a full date."""
     if not date_obj: return "Unknown Date"
     try:
-        # This will always return the format "Mon Day, Year" e.g., "Jun 27, 2025"
         return date_obj.strftime('%b %d, %Y')
     except Exception:
         return "Invalid Date"
@@ -43,7 +46,6 @@ async def query_articles_async(filters):
     try:
         base_query, params = f"SELECT * FROM {TABLE_NAME}", []
         where_clauses = []
-
         if filters.get('category') and filters['category'] != "All Categories":
             where_clauses.append("article_category = ?"); params.append(filters['category'])
         if filters.get('search'):
@@ -53,24 +55,14 @@ async def query_articles_async(filters):
         if filters.get('month') and filters['month'] != "All Months":
             where_clauses.append("strftime('%Y - %B', published_at_iso) = ?"); params.append(filters['month'])
         
-        # Day filter logic has been removed.
-
         if where_clauses: base_query += " WHERE " + " AND ".join(where_clauses)
         
-        # --- MODIFIED SORTING LOGIC ---
-        sort_map = {
-            "Newest First": "published_at_iso DESC", 
-            "Oldest First": "published_at_iso ASC", 
-            "A-Z": "original_title ASC", 
-            "Z-A": "original_title DESC"
-        }
-        # Explicitly default to Newest First if the sort option is missing or invalid
+        sort_map = {"Newest First": "published_at_iso DESC", "Oldest First": "published_at_iso ASC", "A-Z": "original_title ASC", "Z-A": "original_title DESC"}
         sort_order = sort_map.get(filters.get('sort_option'), "published_at_iso DESC")
         base_query += f" ORDER BY {sort_order} LIMIT 50"
         
         result_set = await client.execute(base_query, params)
         articles = rows_to_dict_list(result_set)
-
         for article_dict in articles:
             def safe_json_loads(x):
                 if not isinstance(x, str) or not x: return []
@@ -94,7 +86,6 @@ async def query_articles_async(filters):
 async def get_filter_options_async():
     client = create_db_client()
     if not client: return {"error": "DB connection failed"}
-    # The day filter options are no longer needed
     options = {"categories": ["All Categories"], "months": ["All Months"]}
     try:
         cat_rows = await client.execute(f"SELECT DISTINCT article_category FROM {TABLE_NAME} WHERE article_category IS NOT NULL AND article_category != ''")
@@ -102,20 +93,13 @@ async def get_filter_options_async():
         
         date_rows = await client.execute(f"SELECT DISTINCT strftime('%Y - %B', published_at_iso) as month FROM {TABLE_NAME} WHERE published_at_iso IS NOT NULL AND published_at_iso != '' ORDER BY published_at_iso DESC")
         options["months"].extend([row[0] for row in date_rows if row[0]])
-
         return options
     finally:
         if client: await client.close()
 
 @app.route('/articles', methods=['GET'])
 def get_articles():
-    # Simplified filters, removing 'day'
-    filters = {
-        'search': request.args.get('search'),
-        'sort_option': request.args.get('sort'),
-        'month': request.args.get('month'),
-        'category': request.args.get('category'),
-    }
+    filters = {'search': request.args.get('search'), 'sort_option': request.args.get('sort'), 'month': request.args.get('month'), 'category': request.args.get('category')}
     articles_data = asyncio.run(query_articles_async(filters))
     return jsonify(articles_data)
 
