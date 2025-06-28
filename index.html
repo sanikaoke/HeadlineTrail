@@ -12,9 +12,7 @@
         <h1>📰 HeadlineTrail</h1>
         <p>Stay informed with the latest news stories, enhanced with historical context and key term definitions.</p>
     </header>
-
     <main>
-        <!-- Filter Controls Container -->
         <div id="filter-controls">
             <input type="text" id="search-input" placeholder="Search keywords..." aria-label="Search articles">
             <select id="sort-select" aria-label="Sort articles by">
@@ -23,38 +21,15 @@
                 <option value="A-Z">Title A-Z</option>
                 <option value="Z-A">Title Z-A</option>
             </select>
-            <select id="category-select" aria-label="Filter by category">
-                 <option value="All Categories">All Categories</option>
-                 {/* Options loaded dynamically */}
-            </select>
-            <select id="month-select" aria-label="Filter by month">
-                <option value="All Months">All Months</option>
-                {/* Options loaded dynamically */}
-            </select>
-            <select id="day-select" aria-label="Filter by day">
-                <option value="All Days">All Days</option>
-                {/* Options loaded dynamically */}
-            </select>
-             <button id="refresh-button" title="Fetch latest news">
-                🔄 Fetch Latest News
-            </button>
-        </div>
-
-        <hr class="filter-divider">
-
-        <!-- Main Content Area -->
-        <div id="content-area">
-            <div id="loading-indicator" style="display: none; text-align: center; padding: 2em;">
-                🔄 Loading articles...
+            <select id="category-select" aria-label="Filter by category"><option value="All Categories">All Categories</option></select>
+            <select id="month-select" aria-label="Filter by month"><option value="All Months">All Months</option></select>
             </div>
+        <hr class="filter-divider">
+        <div id="content-area">
+            <div id="loading-indicator" style="display: none; text-align: center; padding: 2em;">🔄 Loading articles...</div>
             <div id="error-message" style="display: none;"></div>
             <div id="no-results-message" style="display: none;"></div>
-
-
-            <div id="news-grid" class="view active-view">
-                {/* News cards inserted here */}
-            </div>
-
+            <div id="news-grid" class="view active-view"></div>
             <div id="article-detail" class="view">
                 <button id="back-button">⬅️ Back to Articles</button>
                 <hr>
@@ -67,9 +42,6 @@
                         <h2>Article Content</h2>
                         <hr class="content-divider">
                         <div id="detail-content"></div>
-                        <div id="read-more-container" class="read-more-section">
-                            <!-- Fallback button will be inserted here when needed -->
-                        </div>
                     </div>
                     <div class="article-sidebar">
                         <div class="sidebar-section">
@@ -85,11 +57,9 @@
             </div>
         </div>
     </main>
-
     <footer>
        <p>HeadlineTrail - News with Context</p>
     </footer>
-
     <script src="script.js"></script>
 </body>
 </html>
