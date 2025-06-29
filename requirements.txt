@@ -1,5 +1,5 @@
 Flask
-flask_cors
+flask-cors
 requests
 openai
 pydantic
