@@ -18,7 +18,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const detailGlossary = document.getElementById('detail-glossary');
     const detailLinkContainer = document.getElementById('detail-link-container');
 
-    const backendBaseUrl = 'https://headlinetrail-backend.onrender.com';
+    const backendBaseUrl = 'https://headlinetrail.onrender.com';
     const articlesUrl = `${backendBaseUrl}/articles`;
     const filterOptionsUrl = `${backendBaseUrl}/filter-options`;
 
