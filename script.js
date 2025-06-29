@@ -1,107 +1,187 @@
-import os
-import json
-import asyncio
-from datetime import datetime, timezone
-from flask import Flask, jsonify, request
-from flask_cors import CORS
-from dotenv import load_dotenv
-import libsql_client
+document.addEventListener('DOMContentLoaded', () => {
+    const newsGrid = document.getElementById('news-grid');
+    const articleDetailView = document.getElementById('article-detail');
+    const filterControlsDiv = document.getElementById('filter-controls');
+    const loadingIndicator = document.getElementById('loading-indicator');
+    const errorMessageDiv = document.getElementById('error-message');
+    const noResultsMessageDiv = document.getElementById('no-results-message');
+    const searchInput = document.getElementById('search-input');
+    const sortSelect = document.getElementById('sort-select');
+    const categorySelect = document.getElementById('category-select');
+    const monthSelect = document.getElementById('month-select');
+    const detailBackButton = document.getElementById('back-button');
+    const detailTitle = document.getElementById('detail-title');
+    const detailCaption = document.getElementById('detail-caption');
+    const detailImage = document.getElementById('detail-image');
+    const detailContent = document.getElementById('detail-content');
+    const detailTimeline = document.getElementById('detail-timeline');
+    const detailGlossary = document.getElementById('detail-glossary');
+    const detailLinkContainer = document.getElementById('detail-link-container');
 
-app = Flask(__name__)
-CORS(app)
+    const backendBaseUrl = 'https://headlinetrail-backend.onrender.com';
+    const articlesUrl = `${backendBaseUrl}/articles`;
+    const filterOptionsUrl = `${backendBaseUrl}/filter-options`;
 
-TABLE_NAME = "articles"
-IMAGE_COLUMN_NAME = "article_url_to_image"
-DEFAULT_IMAGE = "https://images.unsplash.com/photo-1586339949916-3e9457bef6d3?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=600&q=80"
+    let currentFilters = { search: '', sort_option: 'Newest First', category: 'All Categories', month: 'All Months' };
+    let availableFilterOptions = { categories: ["All Categories"], months: ["All Months"] };
+    
+    const IMAGE_COLUMN_NAME = "article_url_to_image";
+    const DEFAULT_IMAGE = "https://images.unsplash.com/photo-1586339949916-3e9457bef6d3?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=600&q=80";
 
-def create_db_client():
-    url = os.getenv("TURSO_DATABASE_URL")
-    auth_token = os.getenv("TURSO_AUTH_TOKEN")
-    if not url or not auth_token:
-        print("DATABASE ERROR: Missing Turso credentials.")
-        return None
-    url = url.replace("libsql://", "https://")
-    return libsql_client.create_client(url=url, auth_token=auth_token)
+    function displayMessage(element, message, isError = false) {
+        element.textContent = message;
+        element.style.display = 'block';
+        if(isError) { element.style.backgroundColor = '#f8d7da'; element.style.color = '#842029'; }
+        if (element === errorMessageDiv || element === noResultsMessageDiv) {
+            if (newsGrid) newsGrid.style.display = 'none';
+        }
+    }
 
-def format_date_for_display(date_obj):
-    if not date_obj: return "Unknown Date"
-    try:
-        now = datetime.now(timezone.utc)
-        if date_obj.tzinfo is None: date_obj = date_obj.replace(tzinfo=timezone.utc)
-        delta = now - date_obj
-        if delta.days == 0: return f"Today, {date_obj.strftime('%b %d')}"
-        elif delta.days == 1: return f"Yesterday, {date_obj.strftime('%b %d')}"
-        else: return f"{delta.days} days ago"
-    except Exception: return "Invalid Date"
+    function hideMessages() {
+        loadingIndicator.style.display = 'none';
+        errorMessageDiv.style.display = 'none';
+        noResultsMessageDiv.style.display = 'none';
+    }
 
-def rows_to_dict_list(rows):
-    if not rows: return []
-    return [dict(zip(rows.columns, row)) for row in rows]
+    function switchView(viewIdToShow) {
+        document.querySelectorAll('.view').forEach(view => { if (view) view.style.display = 'none'; });
+        const viewToShow = document.getElementById(viewIdToShow);
+        if (viewToShow) {
+            viewToShow.style.display = (viewIdToShow === 'news-grid') ? 'grid' : 'block';
+        }
+        filterControlsDiv.style.display = (viewIdToShow === 'news-grid') ? 'flex' : 'none';
+        window.scrollTo(0, 0);
+    }
 
-async def query_articles_async(filters):
-    client = create_db_client()
-    if not client: return []
-    try:
-        base_query, params = f"SELECT * FROM {TABLE_NAME}", []
-        where_clauses = []
-        if filters.get('category') and filters['category'] != "All Categories":
-            where_clauses.append("article_category = ?"); params.append(filters['category'])
-        if filters.get('search'):
-            search_term = f"%{filters['search'].lower()}%"
-            where_clauses.append("(LOWER(original_title) LIKE ? OR LOWER(llm_generated_title) LIKE ? OR LOWER(article_description) LIKE ? OR LOWER(source) LIKE ? OR LOWER(article_content) LIKE ?)")
-            params.extend([search_term] * 5)
-        if filters.get('month') and filters['month'] != "All Months":
-            where_clauses.append("strftime('%Y - %B', published_at_iso) = ?"); params.append(filters['month'])
-        if where_clauses: base_query += " WHERE " + " AND ".join(where_clauses)
+    async function fetchFilterOptions() {
+        try {
+            const response = await fetch(filterOptionsUrl);
+            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+            const optionsData = await response.json();
+            availableFilterOptions = {
+                categories: optionsData.categories || ["All Categories"],
+                months: optionsData.months || ["All Months"],
+            };
+            populateFilterOptions();
+        } catch (error) {
+            displayMessage(errorMessageDiv, `Could not load filter options: ${error.message}.`, true);
+        }
+    }
+
+    function populateFilterOptions() {
+        const populateSelect = (selectEl, options) => {
+            selectEl.innerHTML = '';
+            options.forEach(opt => {
+                const option = document.createElement('option');
+                option.value = opt; option.textContent = opt;
+                selectEl.appendChild(option);
+            });
+        };
+        populateSelect(categorySelect, availableFilterOptions.categories);
+        populateSelect(monthSelect, availableFilterOptions.months);
+    }
+
+    async function fetchAndRenderArticles(filters) {
+        hideMessages();
+        loadingIndicator.style.display = 'block';
+        newsGrid.innerHTML = '';
+        const params = new URLSearchParams();
+        if (filters.search) params.append('search', filters.search);
+        if (filters.sort_option) params.append('sort', filters.sort_option);
+        if (filters.month && filters.month !== 'All Months') params.append('month', filters.month);
+        if (filters.category && filters.category !== "All Categories") params.append('category', filters.category);
         
-        sort_map = {"Newest First": "published_at_iso DESC", "Oldest First": "published_at_iso ASC", "A-Z": "original_title ASC", "Z-A": "original_title DESC"}
-        sort_order = sort_map.get(filters.get('sort_option'), "published_at_iso DESC")
+        try {
+            const response = await fetch(`${articlesUrl}?${params.toString()}`);
+            loadingIndicator.style.display = 'none';
+            if (!response.ok) throw new Error(`Network error (${response.status})`);
+            const articles = await response.json();
+            renderArticleGrid(articles);
+        } catch (error) {
+            displayMessage(errorMessageDiv, `Failed to load articles: ${error.message}. Ensure backend is running.`, true);
+        }
+    }
+
+    function renderArticleGrid(articles) {
+        newsGrid.innerHTML = '';
+        if (!articles || articles.length === 0) {
+            displayMessage(noResultsMessageDiv, "No articles found matching your filters.");
+            return;
+        }
+        newsGrid.style.display = 'grid';
+        articles.forEach(article => {
+            const card = document.createElement('div');
+            card.className = 'news-card';
+            let imageUrl = article[IMAGE_COLUMN_NAME] || DEFAULT_IMAGE;
+            card.innerHTML = `
+                <img src="${imageUrl}" alt="" onerror="this.onerror=null;this.src='${DEFAULT_IMAGE}';">
+                <div class="card-content">
+                    <h6></h6>
+                    <div class="caption"></div>
+                    <button>Read Article</button>
+                </div>
+            `;
+            card.querySelector('h6').textContent = article.original_title || 'Untitled';
+            card.querySelector('.caption').textContent = `${article.source || 'Unknown'} | ${article.published_at_formatted || 'Unknown Date'}`;
+            card.querySelector('button').addEventListener('click', () => showArticleDetail(article));
+            newsGrid.appendChild(card);
+        });
+    }
+
+    function showArticleDetail(article) {
+        detailTitle.textContent = article.original_title || 'Untitled';
+        detailCaption.textContent = `Source: ${article.source || 'Unknown'} | Published: ${article.published_at_formatted || 'Unknown'}`;
+        detailImage.src = article[IMAGE_COLUMN_NAME] || DEFAULT_IMAGE;
+        detailImage.style.display = 'block';
+        detailContent.textContent = article.article_content || 'Content not available.';
+
+        detailLinkContainer.innerHTML = ''; 
+        if (article.original_url && article.original_url !== '#') {
+            const linkButton = document.createElement('a');
+            linkButton.href = article.original_url;
+            linkButton.textContent = "Read Article Online";
+            linkButton.target = "_blank";
+            linkButton.rel = "noopener noreferrer";
+            linkButton.className = "read-more-button";
+            detailLinkContainer.appendChild(linkButton);
+        }
+
+        const renderList = (element, data, template) => {
+            element.innerHTML = '';
+            if (data && data.length > 0) {
+                data.forEach(entry => {
+                    const entryDiv = document.createElement('div');
+                    entryDiv.innerHTML = template(entry);
+                    element.appendChild(entryDiv);
+                });
+            } else {
+                element.innerHTML = `<p>No ${element.id.includes('timeline') ? 'timeline entries' : 'glossary terms'} available.</p>`;
+            }
+        };
+        renderList(detailTimeline, article.historical_context, e => `<p><strong>${e.year||'?'}: ${e.title||'Event'}</strong></p><p style="margin-top: 0.2em;">${e.summary||''}</p>`);
+        renderList(detailGlossary, article.glossary, e => `<strong>${e.word||'?'}:</strong> ${e.definition||''}`);
         
-        # THIS IS THE CHANGED LINE: The "LIMIT 50" has been removed.
-        base_query += f" ORDER BY {sort_order}"
-        
-        result_set = await client.execute(base_query, params)
-        articles = rows_to_dict_list(result_set)
-        for article_dict in articles:
-            def safe_json_loads(x):
-                if not isinstance(x, str) or not x: return []
-                try: return json.loads(x)
-                except Exception: return []
-            article_dict["historical_context"] = safe_json_loads(article_dict.get("historical_context"))
-            article_dict["glossary"] = safe_json_loads(article_dict.get("glossary"))
-            if not article_dict.get(IMAGE_COLUMN_NAME): article_dict[IMAGE_COLUMN_NAME] = DEFAULT_IMAGE
-            try:
-                iso_str = article_dict.get('published_at_iso', '')
-                if iso_str:
-                    if iso_str.endswith('Z'): iso_str = iso_str[:-1] + '+00:00'
-                    article_dict['published_at_formatted'] = format_date_for_display(datetime.fromisoformat(iso_str))
-                else: article_dict['published_at_formatted'] = "Unknown Date"
-            except Exception: article_dict['published_at_formatted'] = "Unknown Date"
-        return articles
-    finally:
-        if client: await client.close()
+        switchView('article-detail');
+    }
 
-async def get_filter_options_async():
-    client = create_db_client()
-    if not client: return {"error": "DB connection failed"}
-    options = {"categories": ["All Categories"], "months": ["All Months"]}
-    try:
-        cat_rows = await client.execute(f"SELECT DISTINCT article_category FROM {TABLE_NAME} WHERE article_category IS NOT NULL AND article_category != ''")
-        options["categories"].extend(sorted(list(set([row[0] for row in cat_rows if row[0]]))))
-        date_rows = await client.execute(f"SELECT DISTINCT strftime('%Y - %B', published_at_iso) as month FROM {TABLE_NAME} WHERE published_at_iso IS NOT NULL AND published_at_iso != '' ORDER BY published_at_iso DESC")
-        options["months"].extend([row[0] for row in date_rows if row[0]])
-        return options
-    finally:
-        if client: await client.close()
+    function handleFilterChange() {
+        currentFilters = { search: searchInput.value, sort_option: sortSelect.value, category: categorySelect.value, month: monthSelect.value };
+        fetchAndRenderArticles(currentFilters);
+    }
+    
+    [searchInput, sortSelect, categorySelect, monthSelect].forEach(el => {
+        el.addEventListener('change', handleFilterChange);
+    });
+    searchInput.addEventListener('input', handleFilterChange);
 
-@app.route('/articles', methods=['GET'])
-def get_articles():
-    filters = {k: v for k, v in request.args.items()}
-    articles_data = asyncio.run(query_articles_async(filters))
-    return jsonify(articles_data)
+    detailBackButton.addEventListener('click', () => switchView('news-grid'));
 
-@app.route('/filter-options', methods=['GET'])
-def get_filter_options():
-    options = asyncio.run(get_filter_options_async())
-    if "error" in options: return jsonify(options), 500
-    return jsonify(options)
+    function init() {
+        switchView('news-grid');
+        loadingIndicator.style.display = 'block';
+        fetchFilterOptions().then(() => {
+            fetchAndRenderArticles(currentFilters);
+        });
+    }
+    init();
+});
