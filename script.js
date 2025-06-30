@@ -79,13 +79,35 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function renderTimeline(items) {
-        // your existing timeline-rendering logic...
-    }
+  // Clear out any old entries
+  detailTimeline.innerHTML = '';
+  if (items && items.length > 0) {
+    items.forEach(e => {
+      const entryDiv = document.createElement('div');
+      entryDiv.innerHTML = `
+        <p><strong>${e.year || ''} – ${e.title || ''}</strong></p>
+        <p style="margin-top: 0.2em;">${e.summary || ''}</p>
+      `;
+      detailTimeline.appendChild(entryDiv);
+    });
+  } else {
+    detailTimeline.innerHTML = `<p>No timeline entries available.</p>`;
+  }
+}
 
-    function renderGlossary(items) {
-        // your existing glossary-rendering logic...
-    }
-
+function renderGlossary(items) {
+  // Clear out any old terms
+  detailGlossary.innerHTML = '';
+  if (items && items.length > 0) {
+    items.forEach(e => {
+      const entryDiv = document.createElement('div');
+      entryDiv.innerHTML = `<strong>${e.word || '?'}:</strong> ${e.definition || ''}`;
+      detailGlossary.appendChild(entryDiv);
+    });
+  } else {
+    detailGlossary.innerHTML = `<p>No glossary terms available.</p>`;
+  }
+}
     function showArticleDetail(article) {
         detailTitle.textContent   = article.original_title || 'Untitled';
         detailCaption.textContent = `Source: ${article.source_name || 'Unknown'} | Published: ${article.published_at_formatted || 'Unknown'}`;
@@ -120,7 +142,21 @@ document.addEventListener('DOMContentLoaded', () => {
         };
         populateSelect(sortSelect,    ["Newest First", "Oldest First"]);
         populateSelect(categorySelect, availableFilterOptions.categories);
-        populateSelect(monthSelect,    availableFilterOptions.months);
+        monthSelect.innerHTML = '';
+
+        const placeholder = document.createElement('option');
+        placeholder.value       = '';
+        placeholder.textContent = 'All Months';
+        placeholder.disabled    = true;
+        placeholder.selected    = currentFilters.month === '';
+        monthSelect.appendChild(placeholder);
+    
+        availableFilterOptions.months.forEach(m => {
+          const o = document.createElement('option');
+          o.value       = m;
+          o.textContent = m;
+          monthSelect.appendChild(o);
+        });
     }
 
     async function fetchFilterOptions() {
@@ -135,7 +171,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             availableFilterOptions = {
                 categories: ["All Categories", ...cats],
-                months:     ["All Months",     ...mths]
+                months:     opts.months || []
             };
 
             populateFilterOptions();
