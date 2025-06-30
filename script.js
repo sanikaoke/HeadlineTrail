@@ -112,6 +112,9 @@ function renderGlossary(items) {
         detailTitle.textContent   = article.original_title || 'Untitled';
         detailCaption.textContent = `Source: ${article.source_name || 'Unknown'} | Published: ${article.published_at_formatted || 'Unknown'}`;
         detailImage.src           = article[IMAGE_COLUMN_NAME] || DEFAULT_IMAGE;
+        //new code next two lines
+        detailImage.style.display = 'block';
+        detailImage.onerror = () => { detailImage.onerror = null; detailImage.src = DEFAULT_IMAGE; };
         detailContent.textContent = article.article_content || 'Content not available.';
 
         detailLinkContainer.innerHTML = '';
