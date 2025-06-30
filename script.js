@@ -125,8 +125,8 @@ function renderGlossary(items) {
             detailLinkContainer.appendChild(a);
         }
 
-        renderTimeline(article.historical_events || []);
-        renderGlossary(article.key_terms || []);
+        renderTimeline(article.historical_context || []);
+        renderGlossary(article.glossary           || []);
         switchView('detail');
     }
 
