@@ -222,7 +222,12 @@ function renderGlossary(items) {
             const resp = await fetch(`${articlesUrl}?${params.toString()}`);
             loadingIndicator.style.display = 'none';
             if (!resp.ok) throw new Error(resp.status);
-            const articles = await resp.json();
+            //const articles = await resp.json();
+            //renderArticleGrid(articles);
+            let articles = await resp.json();
+
+            // Exclude specific article by title
+            articles = articles.filter(article => article.original_title !== "US Treasury asks Congress to scrap retaliatory tax measure in Trump budget bill - Financial Times");
             renderArticleGrid(articles);
         } catch (err) {
             displayMessage(errorMessageDiv, `Failed to load articles: ${err.message}. Ensure backend is running.`, true);
