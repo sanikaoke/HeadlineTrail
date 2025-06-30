@@ -6,6 +6,7 @@ from flask import Flask, jsonify, request
 from flask_cors import CORS # Re-import the CORS library
 from dotenv import load_dotenv
 import libsql_client
+import re
 
 app = Flask(__name__)
 
@@ -58,10 +59,15 @@ async def query_articles_async(filters):
             where_clauses.append("(LOWER(original_title) LIKE ? OR LOWER(llm_generated_title) LIKE ? OR LOWER(article_description) LIKE ? OR LOWER(source) LIKE ? OR LOWER(article_content) LIKE ?)")
             params.extend([search_term] * 5)
         if filters.get('month') and filters['month'] != "All Months":
-            where_clauses.append("strftime('%Y - %B', published_at_iso) = ?"); params.append(filters['month'])
-        if filters.get('day') and filters['day'] != "All Days":
-            where_clauses.append("strftime('%d', published_at_iso) = ?"); params.append(filters['day'].zfill(2))
-        
+            month_param = filters['month']
+            # if it's in ISO format "YYYY-MM", use %Y-%m, otherwise fall back to human "%Y - %B"
+            if re.match(r'^\d{4}-\d{2}$', month_param):
+                where_clauses.append("strftime('%Y-%m', published_at_iso) = ?")
+                params.append(month_param)
+            else:
+                where_clauses.append("strftime('%Y - %B', published_at_iso) = ?")
+                params.append(month_param)
+
         if where_clauses: base_query += " WHERE " + " AND ".join(where_clauses)
         
         sort_map = {"Newest First": "published_at_iso DESC", "Oldest First": "published_at_iso ASC", "A-Z": "original_title ASC", "Z-A": "original_title DESC"}
