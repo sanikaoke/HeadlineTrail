@@ -141,7 +141,21 @@ function renderGlossary(items) {
             });
         };
         populateSelect(sortSelect,    ["Newest First", "Oldest First"]);
-        populateSelect(categorySelect, availableFilterOptions.categories);
+        categorySelect.innerHTML = '';
+
+        const catPlaceholder = document.createElement('option');
+        catPlaceholder.value       = '';
+        catPlaceholder.textContent = 'All Categories';
+        catPlaceholder.disabled    = true;
+        catPlaceholder.selected    = currentFilters.category === '';
+        categorySelect.appendChild(catPlaceholder);
+        
+        availableFilterOptions.categories.forEach(c => {
+          const o = document.createElement('option');
+          o.value       = c;
+          o.textContent = c;
+          categorySelect.appendChild(o);
+        });
         monthSelect.innerHTML = '';
 
         const placeholder = document.createElement('option');
@@ -170,7 +184,7 @@ function renderGlossary(items) {
             const mths = opts.months     || [];
 
             availableFilterOptions = {
-                categories: ["All Categories", ...cats],
+                categories: opts.categories || [],
                 months:     opts.months || []
             };
 
