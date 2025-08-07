@@ -176,7 +176,7 @@ def insert_or_update_article(article_data):
             original_url, original_title, llm_generated_title, author, source, published_at, published_at_iso,
             article_description, article_content, article_url_to_image,
             historical_context, glossary, article_category, llm_input_source, last_updated
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(original_url) DO UPDATE SET
             original_title=excluded.original_title,
             llm_generated_title=excluded.llm_generated_title,
@@ -238,8 +238,8 @@ def fetch_news_articles(api_key, from_date, to_date, search_query="news"):
         f"https://newsapi.org/v2/everything?"
         f"q={search_query}&"
         f"language=en&"
-        f"from={"2025-07-20"}&"
-        f"to={"2025-08-06"}&"
+        f"from=2025-08-05&"
+        f"to=2025-08-06&"
         f"sortBy=popularity&"
         f"excludeDomains={excluded}&"
         f"pageSize=100&"
@@ -365,7 +365,7 @@ def scrape_bloomberg(soup):
     return content if len(content) > 200 else None
 
 # --- Helper: Call OpenAI ---
-def get_timeline_and_glossary(client: OpenAI, article_text: str, model_name: str = "gpt-4o"):
+def get_timeline_and_glossary(client: OpenAI, article_text: str, model_name: str = "gpt-5"):
     """Calls OpenAI API to generate timeline, glossary, and category."""
     if not client:
         print("LLM Error: Client not configured.")
