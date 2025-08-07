@@ -111,6 +111,7 @@ def init_db():
                 original_url TEXT PRIMARY KEY NOT NULL,
                 original_title TEXT,
                 llm_generated_title TEXT,
+                author TEXT, 
                 source TEXT,
                 published_at TEXT,
                 published_at_iso TEXT, -- Store ISO format for easier sorting
@@ -138,7 +139,7 @@ def insert_or_update_article(article_data):
     """Inserts a new article or updates an existing one based on URL."""
     conn = None
     required_keys = [
-        "original_title", "source", "published_at", "article_description",
+        "original_title", "author", "source", "published_at", "article_description",
         "article_content", "article_url", "article_url_to_image",
         "historical_context", "glossary", "article_category", "llm_input_source",
         "llm_generated_title"
@@ -172,13 +173,14 @@ def insert_or_update_article(article_data):
     # Use ON CONFLICT for UPSERT (Update or Insert)
     sql = f'''
         INSERT INTO {TABLE_NAME} (
-            original_url, original_title, llm_generated_title, source, published_at, published_at_iso,
+            original_url, original_title, llm_generated_title, author, source, published_at, published_at_iso,
             article_description, article_content, article_url_to_image,
             historical_context, glossary, article_category, llm_input_source, last_updated
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(original_url) DO UPDATE SET
             original_title=excluded.original_title,
             llm_generated_title=excluded.llm_generated_title,
+            author=excluded.author,
             source=excluded.source,
             published_at=excluded.published_at,
             published_at_iso=excluded.published_at_iso,
@@ -195,6 +197,7 @@ def insert_or_update_article(article_data):
         article_url,
         article_data.get("original_title"),
         article_data.get("llm_generated_title"),
+        article_data.get("author"), 
         article_data.get("source"),
         article_data.get("published_at"),
         published_at_iso,
@@ -224,25 +227,30 @@ def insert_or_update_article(article_data):
 
 
 # --- Helper: Fetch News ---
-def fetch_news_articles(api_key, from_date=None, to_date=None, country="us"):
-    """Fetches news articles from NewsAPI for a specific date range."""
-    if not api_key:
-        print("NewsAPI key not available.")
-        return []
-
-    # Build the API URL with date parameters
-    api_url = f"https://newsapi.org/v2/top-headlines?country={country}"
-    if from_date and to_date:
-        api_url += f"&from={from_date}&to={to_date}"
-    api_url += f"&apiKey={api_key}"
-    
-    print(f"Fetching news for period: {from_date} to {to_date}")
-    
+def fetch_news_articles(api_key, from_date, to_date, search_query="news"):
+    excluded = (
+        "wsj.com,nytimes.com,ft.com,bloomberg.com,economist.com,latimes.com,"
+        "washingtonpost.com,businessinsider.com,theathletic.com,newyorker.com,"
+        "thetimes.co.uk,financialpost.com,lemonde.fr,telegraph.co.uk,irishtimes.com,"
+        "sueddeutsche.de,handelsblatt.com,nzz.ch,chron.com,bostonglobe.com"
+    )
+    api_url = (
+        f"https://newsapi.org/v2/everything?"
+        f"q={search_query}&"
+        f"language=en&"
+        f"from={"2025-07-20"}&"
+        f"to={"2025-08-06"}&"
+        f"sortBy=popularity&"
+        f"excludeDomains={excluded}&"
+        f"pageSize=100&"
+        f"apiKey={api_key}"
+    )
+    print("Calling:", api_url)
     try:
         response = requests.get(api_url, timeout=15)
         response.raise_for_status()
         data = response.json()
-        if data.get("status") == "ok": 
+        if data.get("status") == "ok":
             articles_data = data.get("articles", [])
             print(f"NewsAPI fetch successful: {len(articles_data)} articles.")
             return articles_data
@@ -252,6 +260,7 @@ def fetch_news_articles(api_key, from_date=None, to_date=None, country="us"):
     except Exception as e:
         print(f"NewsAPI request error: {e}")
         return []
+
 
 # --- Helper: Scrape News (newspaper3k) ---
 def scrape_article_text_newspaper(url):
@@ -451,7 +460,7 @@ def process_and_store_articles():
             print(f"\nProcessing date: {start_date}")
             from_date = start_date.isoformat()
             to_date = (start_date + timedelta(days=1)).isoformat()
-            raw_articles = fetch_news_articles(NEWS_API_KEY, from_date, to_date)
+            raw_articles = fetch_news_articles(NEWS_API_KEY, "2025-07-20", "2025-08-06")
             
             daily_count = 0
             
@@ -509,6 +518,7 @@ def process_and_store_articles():
                         db_data = {
                             "llm_generated_title": output.title_entry,
                             "original_title": article_data.get('title', 'N/A'),
+                            "author": article_data.get('author', 'N/A'),
                             "source": article_data.get('source', {}).get('name', 'N/A'),
                             "published_at": article_data.get('publishedAt', 'N/A'),
                             "article_content": article_content,  # Store cleaned content
