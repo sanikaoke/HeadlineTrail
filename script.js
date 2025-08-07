@@ -51,7 +51,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function switchView(view) {
-        newsGrid.style.display         = view === 'news-grid' ? 'grid' : 'none';
+        newsGrid.style.display          = view === 'news-grid' ? 'grid' : 'none';
         articleDetailView.style.display = view === 'detail'    ? 'block' : 'none';
         filterControlsDiv.style.display = view === 'news-grid' ? 'flex' : 'none';
     }
@@ -69,7 +69,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 <img src="${imageUrl}" alt="" onerror="this.onerror=null;this.src='${DEFAULT_IMAGE}';">
                 <div class="card-content">
                     <h6>${article.original_title || 'Untitled'}</h6>
-                    <div class="caption">Published: ${article.published_at_formatted || 'Unknown'}</div>
+                    <div class="caption">
+                        By ${article.author || 'Unknown author'} | Published: ${article.published_at_formatted || 'Unknown'}
+                    </div>
                     <button>Read Article</button>
                 </div>
             `;
@@ -79,52 +81,56 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function renderTimeline(items) {
-  // Clear out any old entries
-  detailTimeline.innerHTML = '';
-  if (items && items.length > 0) {
-    items.forEach(e => {
-      const entryDiv = document.createElement('div');
-      entryDiv.innerHTML = `
-        <p><strong>${e.year || ''} – ${e.title || ''}</strong></p>
-        <p style="margin-top: 0.2em;">${e.summary || ''}</p>
-      `;
-      detailTimeline.appendChild(entryDiv);
-    });
-  } else {
-    detailTimeline.innerHTML = `<p>No timeline entries available.</p>`;
-  }
-}
+        detailTimeline.innerHTML = '';
+        if (items && items.length > 0) {
+            items.forEach(e => {
+                const entryDiv = document.createElement('div');
+                entryDiv.innerHTML = `
+                    <p><strong>${e.year || ''} – ${e.title || ''}</strong></p>
+                    <p style="margin-top: 0.2em;">${e.summary || ''}</p>
+                `;
+                detailTimeline.appendChild(entryDiv);
+            });
+        } else {
+            detailTimeline.innerHTML = `<p>No timeline entries available.</p>`;
+        }
+    }
 
-function renderGlossary(items) {
-  // Clear out any old terms
-  detailGlossary.innerHTML = '';
-  if (items && items.length > 0) {
-    items.forEach(e => {
-      const entryDiv = document.createElement('div');
-      entryDiv.innerHTML = `<strong>${e.word || '?'}:</strong> ${e.definition || ''}`;
-      detailGlossary.appendChild(entryDiv);
-    });
-  } else {
-    detailGlossary.innerHTML = `<p>No glossary terms available.</p>`;
-  }
-}
+    function renderGlossary(items) {
+        detailGlossary.innerHTML = '';
+        if (items && items.length > 0) {
+            items.forEach(e => {
+                const entryDiv = document.createElement('div');
+                entryDiv.innerHTML = `<strong>${e.word || '?'}:</strong> ${e.definition || ''}`;
+                detailGlossary.appendChild(entryDiv);
+            });
+        } else {
+            detailGlossary.innerHTML = `<p>No glossary terms available.</p>`;
+        }
+    }
+
     function showArticleDetail(article) {
-        detailTitle.textContent   = article.original_title || 'Untitled';
-        detailCaption.textContent = `Source: ${article.source_name || 'Unknown'} | Published: ${article.published_at_formatted || 'Unknown'}`;
+        detailTitle.textContent = article.original_title || 'Untitled';
+
+        detailCaption.innerHTML = [
+            `By ${article.author || 'Unknown author'}`,
+            `Source: ${article.source || 'Unknown'}`,
+            `Published: ${article.published_at_formatted || 'Unknown'}`
+        ].join(' | ');
+
         detailImage.src           = article[IMAGE_COLUMN_NAME] || DEFAULT_IMAGE;
-        //new code next two lines
         detailImage.style.display = 'block';
-        detailImage.onerror = () => { detailImage.onerror = null; detailImage.src = DEFAULT_IMAGE; };
+        detailImage.onerror       = () => { detailImage.onerror = null; detailImage.src = DEFAULT_IMAGE; };
         detailContent.textContent = article.article_content || 'Content not available.';
 
         detailLinkContainer.innerHTML = '';
         if (article.original_url && article.original_url !== '#') {
             const a = document.createElement('a');
-            a.href    = article.original_url;
+            a.href        = article.original_url;
             a.textContent = 'Read Article Online';
-            a.target  = '_blank';
-            a.rel     = 'noopener noreferrer';
-            a.className = 'read-more-button';
+            a.target      = '_blank';
+            a.rel         = 'noopener noreferrer';
+            a.className   = 'read-more-button';
             detailLinkContainer.appendChild(a);
         }
 
@@ -138,7 +144,7 @@ function renderGlossary(items) {
             selectEl.innerHTML = '';
             options.forEach(opt => {
                 const o = document.createElement('option');
-                o.value = opt;
+                o.value       = opt;
                 o.textContent = opt;
                 selectEl.appendChild(o);
             });
@@ -154,10 +160,10 @@ function renderGlossary(items) {
         categorySelect.appendChild(catPlaceholder);
         
         availableFilterOptions.categories.forEach(c => {
-          const o = document.createElement('option');
-          o.value       = c;
-          o.textContent = c;
-          categorySelect.appendChild(o);
+            const o = document.createElement('option');
+            o.value       = c;
+            o.textContent = c;
+            categorySelect.appendChild(o);
         });
         monthSelect.innerHTML = '';
 
@@ -169,10 +175,10 @@ function renderGlossary(items) {
         monthSelect.appendChild(placeholder);
     
         availableFilterOptions.months.forEach(m => {
-          const o = document.createElement('option');
-          o.value       = m;
-          o.textContent = m;
-          monthSelect.appendChild(o);
+            const o = document.createElement('option');
+            o.value       = m;
+            o.textContent = m;
+            monthSelect.appendChild(o);
         });
     }
 
@@ -181,16 +187,10 @@ function renderGlossary(items) {
             const resp = await fetch(filterOptionsUrl);
             if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
             const opts = await resp.json();
-
-            // Always prepend the "All ..." sentinel
-            const cats = opts.categories || [];
-            const mths = opts.months     || [];
-
             availableFilterOptions = {
                 categories: opts.categories || [],
-                months:     opts.months || []
+                months:     opts.months     || []
             };
-
             populateFilterOptions();
         } catch (err) {
             displayMessage(errorMessageDiv, `Could not load filter options: ${err.message}`, true);
@@ -205,15 +205,12 @@ function renderGlossary(items) {
         const params = new URLSearchParams();
         if (filters.search)          params.append('search', filters.search);
         if (filters.sort_option)     params.append('sort',   filters.sort_option);
-
         if (filters.month && filters.month !== 'All Months') {
-            // Split "YYYY - MonthName" → ["2025", "June"]
             const [year, monthName] = filters.month.split(' - ');
             const idx = new Date(`${monthName} 1, ${year}`).getMonth() + 1;
-            const code = String(idx).padStart(2, '0');  // "06" for June
+            const code = String(idx).padStart(2, '0');
             params.append('month', `${year}-${code}`);
         }
-
         if (filters.category && filters.category !== 'All Categories') {
             params.append('category', filters.category);
         }
@@ -222,12 +219,9 @@ function renderGlossary(items) {
             const resp = await fetch(`${articlesUrl}?${params.toString()}`);
             loadingIndicator.style.display = 'none';
             if (!resp.ok) throw new Error(resp.status);
-            //const articles = await resp.json();
-            //renderArticleGrid(articles);
             let articles = await resp.json();
-
-            // Exclude specific article by title
-            articles = articles.filter(article => article.original_title !== "US Treasury asks Congress to scrap retaliatory tax measure in Trump budget bill - Financial Times");
+            // filter out that one FT article if needed
+            articles = articles.filter(a => a.original_title !== "US Treasury asks Congress to scrap retaliatory tax measure in Trump budget bill - Financial Times");
             renderArticleGrid(articles);
         } catch (err) {
             displayMessage(errorMessageDiv, `Failed to load articles: ${err.message}. Ensure backend is running.`, true);
