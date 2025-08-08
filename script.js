@@ -110,34 +110,48 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function showArticleDetail(article) {
-        detailTitle.textContent = article.original_title || 'Untitled';
+    detailTitle.textContent = article.original_title || 'Untitled';
 
-        detailCaption.innerHTML = [
-            `By ${article.author || 'Unknown author'}`,
-            `Source: ${article.source || 'Unknown'}`,
-            `Published: ${article.published_at_formatted || 'Unknown'}`
-        ].join(' | ');
+    detailCaption.innerHTML = [
+        `By ${article.author || 'Unknown author'}`,
+        `Source: ${article.source || 'Unknown'}`,
+        `Published: ${article.published_at_formatted || 'Unknown'}`
+    ].join(' | ');
 
-        detailImage.src           = article[IMAGE_COLUMN_NAME] || DEFAULT_IMAGE;
-        detailImage.style.display = 'block';
-        detailImage.onerror       = () => { detailImage.onerror = null; detailImage.src = DEFAULT_IMAGE; };
-        detailContent.textContent = article.article_content || 'Content not available.';
+    detailImage.src           = article[IMAGE_COLUMN_NAME] || DEFAULT_IMAGE;
+    detailImage.style.display = 'block';
+    detailImage.onerror       = () => { detailImage.onerror = null; detailImage.src = DEFAULT_IMAGE; };
+    detailContent.textContent = article.article_content || 'Content not available.';
 
-        detailLinkContainer.innerHTML = '';
-        if (article.original_url && article.original_url !== '#') {
-            const a = document.createElement('a');
-            a.href        = article.original_url;
-            a.textContent = 'Read Article Online';
-            a.target      = '_blank';
-            a.rel         = 'noopener noreferrer';
-            a.className   = 'read-more-button';
-            detailLinkContainer.appendChild(a);
-        }
-
-        renderTimeline(article.historical_context || []);
-        renderGlossary(article.glossary           || []);
-        switchView('detail');
+    if (article.summarized_content && article.summarized_content.trim() !== "") {
+        const bulletPoints = article.summarized_content
+            .split('- ')
+            .filter(point => point.trim() !== '');
+        
+        const summaryHTML = `
+            <h3 style="margin-top:1em;">Quick Summary</h3>
+            <ul style="padding-left:1.2em;">
+                ${bulletPoints.map(point => `<li>${point.trim()}</li>`).join('')}
+            </ul>
+        `;
+        detailContent.insertAdjacentHTML('afterend', summaryHTML);
     }
+
+    detailLinkContainer.innerHTML = '';
+    if (article.original_url && article.original_url !== '#') {
+        const a = document.createElement('a');
+        a.href        = article.original_url;
+        a.textContent = 'Read Article Online';
+        a.target      = '_blank';
+        a.rel         = 'noopener noreferrer';
+        a.className   = 'read-more-button';
+        detailLinkContainer.appendChild(a);
+    }
+
+    renderTimeline(article.historical_context || []);
+    renderGlossary(article.glossary           || []);
+    switchView('detail');
+}
 
     function populateFilterOptions() {
         const populateSelect = (selectEl, options) => {
