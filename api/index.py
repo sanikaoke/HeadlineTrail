@@ -84,6 +84,12 @@ async def query_articles_async(filters):
             article_dict["historical_context"] = safe_json_loads(article_dict.get("historical_context"))
             article_dict["glossary"] = safe_json_loads(article_dict.get("glossary"))
             if not article_dict.get(IMAGE_COLUMN_NAME): article_dict[IMAGE_COLUMN_NAME] = DEFAULT_IMAGE
+
+            summary_text = article_dict.get("summarized_content")
+            if not summary_text:
+                summary_text = article_dict.get("article_content", "")
+            article_dict["article_content"] = summary_text
+            
             try:
                 iso_str = article_dict.get('published_at_iso', '')
                 if iso_str:
