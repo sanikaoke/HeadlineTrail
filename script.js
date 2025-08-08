@@ -123,7 +123,6 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function showArticleDetail(article) {
-    window.scrollTo(0, 0);
     // reset
     detailContent.innerHTML = '';
     detailTimeline.innerHTML = '';
@@ -159,6 +158,9 @@ document.addEventListener('DOMContentLoaded', () => {
     renderTimeline(article.historical_context || []);
     renderGlossary(article.glossary || []);
 
+    // ⬆️ Scroll to top when opening an article
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+
     switchView('detail');
   }
 
@@ -172,32 +174,36 @@ document.addEventListener('DOMContentLoaded', () => {
       sortSelect.appendChild(o);
     });
 
-    // Category select
+    // Category select: include "All Categories" only once and set it as default
     categorySelect.innerHTML = '';
     const catAll = document.createElement('option');
     catAll.value = 'All Categories';
     catAll.textContent = 'All Categories';
     categorySelect.appendChild(catAll);
 
-    (availableFilterOptions.categories || []).filter(c => c && c !== 'All Categories').forEach(cat => {
-      const o = document.createElement('option');
-      o.value = cat; o.textContent = cat;
-      categorySelect.appendChild(o);
-    });
+    (availableFilterOptions.categories || [])
+      .filter(c => c && c !== 'All Categories')
+      .forEach(cat => {
+        const o = document.createElement('option');
+        o.value = cat; o.textContent = cat;
+        categorySelect.appendChild(o);
+      });
     categorySelect.value = currentFilters.category || 'All Categories';
 
-    // Month select
+    // Month select: include "All Months" only once and set it as default
     monthSelect.innerHTML = '';
     const monthAll = document.createElement('option');
     monthAll.value = 'All Months';
     monthAll.textContent = 'All Months';
     monthSelect.appendChild(monthAll);
 
-    (availableFilterOptions.months || []).filter(m => m && m !== 'All Months').forEach(m => {
-      const o = document.createElement('option');
-      o.value = m; o.textContent = m;
-      monthSelect.appendChild(o);
-    });
+    (availableFilterOptions.months || [])
+      .filter(m => m && m !== 'All Months')
+      .forEach(m => {
+        const o = document.createElement('option');
+        o.value = m; o.textContent = m;
+        monthSelect.appendChild(o);
+      });
     monthSelect.value = currentFilters.month || 'All Months';
   }
 
@@ -249,6 +255,9 @@ document.addEventListener('DOMContentLoaded', () => {
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
       const articles = await resp.json();
       renderArticleGrid(articles);
+
+      // ⬆️ After refresh, ensure the grid starts at the top
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (err) {
       loadingIndicator.style.display = 'none';
       errorMessageDiv.textContent = `Failed to load articles: ${err.message}`;
@@ -266,7 +275,7 @@ document.addEventListener('DOMContentLoaded', () => {
     fetchAndRenderArticles(currentFilters);
   }
 
-  // Wire up events (important: update currentFilters FIRST, then fetch)
+  // Wire up events (update filters FIRST, then fetch)
   sortSelect.addEventListener('change', handleFilterChange);
   categorySelect.addEventListener('change', handleFilterChange);
   monthSelect.addEventListener('change', handleFilterChange);
@@ -276,13 +285,17 @@ document.addEventListener('DOMContentLoaded', () => {
     searchInput._t = setTimeout(handleFilterChange, 250);
   });
 
-  detailBackButton.addEventListener('click', () => switchView('news-grid'));
+  detailBackButton.addEventListener('click', () => {
+    switchView('news-grid');
+    // ⬆️ Scroll to top when returning to the grid
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  });
 
   // Init
   (async function init() {
     switchView('news-grid');
     loadingIndicator.style.display = 'block';
-    await fetchFilterOptions();               // populate dropdowns first
+    await fetchFilterOptions();                  // populate dropdowns first
     await fetchAndRenderArticles(currentFilters); // then initial list
   })();
 });
