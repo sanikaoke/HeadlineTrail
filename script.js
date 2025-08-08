@@ -159,7 +159,7 @@ document.addEventListener('DOMContentLoaded', () => {
     renderGlossary(article.glossary || []);
 
     // ⬆️ Scroll to top when opening an article
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    window.scrollTo(0, 0);
 
     switchView('detail');
   }
