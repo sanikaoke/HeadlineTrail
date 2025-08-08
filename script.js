@@ -121,7 +121,7 @@ document.addEventListener('DOMContentLoaded', () => {
     detailImage.src           = article[IMAGE_COLUMN_NAME] || DEFAULT_IMAGE;
     detailImage.style.display = 'block';
     detailImage.onerror       = () => { detailImage.onerror = null; detailImage.src = DEFAULT_IMAGE; };
-    detailContent.textContent = article.article_content || 'Content not available.';
+    //detailContent.textContent = article.article_content || 'Content not available.';
 
     if (article.summarized_content && article.summarized_content.trim() !== "") {
         const bulletPoints = article.summarized_content
@@ -129,7 +129,7 @@ document.addEventListener('DOMContentLoaded', () => {
             .filter(point => point.trim() !== '');
         
         const summaryHTML = `
-            <h3 style="margin-top:1em;">Quick Summary</h3>
+            <h3 style="margin-top:1em;">Article Summary</h3>
             <ul style="padding-left:1.2em;">
                 ${bulletPoints.map(point => `<li>${point.trim()}</li>`).join('')}
             </ul>
