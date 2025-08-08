@@ -178,12 +178,12 @@ document.addEventListener('DOMContentLoaded', () => {
     catAll.textContent = 'All Categories';
     categorySelect.appendChild(catAll);
 
-    (availableFilterOptions.categories || []).forEach(cat => {
+    (availableFilterOptions.categories || []).filter(c => c && c !== 'All Categories').forEach(cat => {
       const o = document.createElement('option');
       o.value = cat; o.textContent = cat;
       categorySelect.appendChild(o);
     });
-    categorySelect.value = currentFilters.category;
+    categorySelect.value = currentFilters.category || 'All Categories';
 
     // Month select
     monthSelect.innerHTML = '';
@@ -192,12 +192,12 @@ document.addEventListener('DOMContentLoaded', () => {
     monthAll.textContent = 'All Months';
     monthSelect.appendChild(monthAll);
 
-    (availableFilterOptions.months || []).forEach(m => {
+    (availableFilterOptions.months || []).filter(m => m && m !== 'All Months').forEach(m => {
       const o = document.createElement('option');
       o.value = m; o.textContent = m;
       monthSelect.appendChild(o);
     });
-    monthSelect.value = currentFilters.month;
+    monthSelect.value = currentFilters.month || 'All Months';
   }
 
   async function fetchFilterOptions() {
