@@ -123,6 +123,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function showArticleDetail(article) {
+    window.scrollTo(0, 0);
     // reset
     detailContent.innerHTML = '';
     detailTimeline.innerHTML = '';
